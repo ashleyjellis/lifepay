@@ -76,7 +76,10 @@ Never give generic advice.`;
         body: JSON.stringify({ messages: newMessages, systemPrompt }),
       });
 
-      if (!res.ok) throw new Error('API error');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(errBody.error ?? `HTTP ${res.status}`);
+      }
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -92,10 +95,11 @@ Never give generic advice.`;
           return updated;
         });
       }
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       setMessages(prev => {
         const updated = [...prev];
-        updated[updated.length - 1] = { role: 'assistant', content: 'Sorry, I couldn\'t connect to the AI. Make sure ANTHROPIC_API_KEY is set.' };
+        updated[updated.length - 1] = { role: 'assistant', content: `Error: ${msg}` };
         return updated;
       });
     } finally {
