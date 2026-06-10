@@ -1,7 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-export const runtime = 'edge';
-
 export async function POST(req: Request) {
   const { messages, systemPrompt } = await req.json() as {
     messages: { role: 'user' | 'assistant'; content: string }[];
