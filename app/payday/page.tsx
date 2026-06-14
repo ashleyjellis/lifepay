@@ -33,11 +33,23 @@ function getLockableMonth() {
   const d = new Date(); d.setMonth(d.getMonth() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
-function generateMonths(): string[] {
-  const now = new Date(); const months: string[] = [];
-  for (let i = 5; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
-  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  months.push(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`);
+function generateMonths(sessionDates: string[]): string[] {
+  const now = new Date();
+  const months: string[] = [];
+  // Past months that have sessions
+  for (let i = 12; i >= 1; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (sessionDates.some(sd => sd.startsWith(ym))) months.push(ym);
+  }
+  // Current month
+  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  months.push(cur);
+  // Next 4 months (lockable + 3 future)
+  for (let i = 1; i <= 4; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
   return months;
 }
 function uid() { return Math.random().toString(36).slice(2); }
@@ -98,7 +110,7 @@ export default function PaydayHome() {
 
   const hh = household;
   const isPartner = hh.mode === 'partner';
-  const months = generateMonths();
+  const months = generateMonths(sessions.map(s => s.date));
   const selectedSession = sessions.find(s => s.date.startsWith(selectedMonth));
   const isLocked = !!selectedSession?.locked_at;
   const isDraft = !!selectedSession && !selectedSession.locked_at;
@@ -125,7 +137,7 @@ export default function PaydayHome() {
             return (
               <button key={ym} onClick={() => setSelectedMonth(ym)}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border transition-colors ${selected ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${locked ? 'bg-emerald-400' : draft ? 'bg-amber-400' : selected ? 'bg-gray-400' : 'bg-gray-300'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${locked ? 'bg-emerald-400' : draft ? 'bg-amber-400' : ym > LOCKABLE_MONTH ? 'bg-blue-300' : selected ? 'bg-gray-400' : 'bg-gray-300'}`} />
                 {monthShort(ym)}{ym === LOCKABLE_MONTH && !locked && <span className="opacity-60">↑</span>}
               </button>
             );
@@ -137,8 +149,8 @@ export default function PaydayHome() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xl font-bold text-gray-900">{monthLabel(selectedMonth)}</div>
-              <div className={`text-xs mt-0.5 font-medium ${isLocked ? 'text-emerald-600' : isDraft ? 'text-amber-600' : 'text-gray-400'}`}>
-                {isLocked ? '● Locked in' : isDraft ? '● In progress' : selectedMonth === LOCKABLE_MONTH ? 'Not yet set up' : 'No payday recorded'}
+              <div className={`text-xs mt-0.5 font-medium ${isLocked ? 'text-emerald-600' : isDraft ? 'text-amber-600' : selectedMonth > LOCKABLE_MONTH ? 'text-blue-400' : 'text-gray-400'}`}>
+                {isLocked ? '● Locked in' : isDraft ? '● In progress' : selectedMonth > LOCKABLE_MONTH ? '● Upcoming' : selectedMonth === LOCKABLE_MONTH ? 'Not yet set up' : 'No payday recorded'}
               </div>
             </div>
             {!selectedSession && selectedMonth === LOCKABLE_MONTH && (
