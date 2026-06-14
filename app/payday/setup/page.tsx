@@ -76,6 +76,7 @@ export default function SetupPage() {
   const [nameA, setNameA] = useState('');
   const [nameB, setNameB] = useState('');
   const [splitA, setSplitA] = useState('50');
+  const [paydayDay, setPaydayDay] = useState('25');
 
   // Joint bills
   const [jointBills, setJointBills] = useState<BillDraft[]>(DEFAULT_JOINT_BILLS);
@@ -158,6 +159,7 @@ export default function SetupPage() {
           personAName: nameA || 'Person A',
           personBName: nameB || 'Person B',
           jointSplitA: parseInt(splitA) || 50,
+          paydayDay: parseInt(paydayDay) || 25,
           defaultSpendingA: parseFloat(spendingA) || 0,
           defaultSpendingB: parseFloat(spendingB) || 0,
           defaultTransportA: parseFloat(transportA) || 0,
@@ -323,6 +325,17 @@ export default function SetupPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <label className="block text-sm font-medium mb-0.5">Payday date</label>
+              <p className="text-xs text-gray-400 mb-3">Which day of the month does your salary land?</p>
+              <div className="flex items-center gap-3">
+                <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
+                  className="w-24 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white text-center font-semibold" />
+                <span className="text-sm text-gray-500">of each month</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">Next month&apos;s payday becomes editable 2 weeks before this date.</p>
             </div>
 
             <button onClick={next} className="w-full bg-[#1a1a1a] text-white py-3.5 rounded-xl font-medium hover:bg-gray-800 transition-colors">

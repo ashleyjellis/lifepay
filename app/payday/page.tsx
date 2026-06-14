@@ -9,6 +9,7 @@ interface Household {
   joint_split_a: number;
   default_spending_a: number; default_spending_b: number;
   default_transport_a: number; default_transport_b: number;
+  payday_day: number;
 }
 interface SessionSummary {
   id: string; date: string; locked_at: string | null;
@@ -29,39 +30,37 @@ function monthShort(ym: string) {
   const [y, m] = ym.split('-');
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
 }
-function getLockableMonth() {
-  const d = new Date(); d.setMonth(d.getMonth() + 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+function toYM(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function getEditableMonths(paydayDay: number): string[] {
+  const now = new Date();
+  const result: string[] = [toYM(now)];
+  for (let i = 1; i <= 3; i++) {
+    const futureMonth = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const unlockDate = new Date(futureMonth.getFullYear(), futureMonth.getMonth(), paydayDay - 14);
+    if (now >= unlockDate) result.push(toYM(futureMonth));
+  }
+  return result;
 }
-function generateMonths(sessionDates: string[]): string[] {
+function generateMonths(sessionDates: string[], paydayDay: number): string[] {
   const now = new Date();
   const months: string[] = [];
-  // Past months that have sessions
   for (let i = 12; i >= 1; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    if (sessionDates.some(sd => sd.startsWith(ym))) months.push(ym);
+    const m = toYM(d);
+    if (sessionDates.some(sd => sd.startsWith(m))) months.push(m);
   }
-  // Current month
-  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  months.push(cur);
-  // Next 4 months (lockable + 3 future)
-  for (let i = 1; i <= 4; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
+  const editable = getEditableMonths(paydayDay);
+  editable.forEach(m => { if (!months.includes(m)) months.push(m); });
   return months;
 }
 function uid() { return Math.random().toString(36).slice(2); }
 const fmt = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(Math.abs(v));
-const LOCKABLE_MONTH = getLockableMonth();
-
 export default function PaydayHome() {
   const router = useRouter();
   const [household, setHousehold] = useState<Household | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [pots, setPots] = useState<Pot[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>(LOCKABLE_MONTH);
+  const [selectedMonth, setSelectedMonth] = useState<string>(toYM(new Date()));
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -110,10 +109,17 @@ export default function PaydayHome() {
 
   const hh = household;
   const isPartner = hh.mode === 'partner';
-  const months = generateMonths(sessions.map(s => s.date));
+  const paydayDay = hh.payday_day ?? 25;
+  const curYM = toYM(new Date());
+  const editableMonths = getEditableMonths(paydayDay);
+  const months = generateMonths(sessions.map(s => s.date), paydayDay);
   const selectedSession = sessions.find(s => s.date.startsWith(selectedMonth));
   const isLocked = !!selectedSession?.locked_at;
   const isDraft = !!selectedSession && !selectedSession.locked_at;
+  const isEditable = editableMonths.includes(selectedMonth) && !isLocked;
+  // Pre-populate future months from latest locked session
+  const latestLockedDetail = detail; // loaded for all sessions including for pre-pop
+  const latestLockedSession = sessions.filter(s => s.locked_at).sort((a,b) => b.date.localeCompare(a.date))[0];
 
   return (
     <div className="min-h-screen bg-[#faf9f7]">
@@ -137,8 +143,8 @@ export default function PaydayHome() {
             return (
               <button key={ym} onClick={() => setSelectedMonth(ym)}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border transition-colors ${selected ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${locked ? 'bg-emerald-400' : draft ? 'bg-amber-400' : ym > LOCKABLE_MONTH ? 'bg-blue-300' : selected ? 'bg-gray-400' : 'bg-gray-300'}`} />
-                {monthShort(ym)}{ym === LOCKABLE_MONTH && !locked && <span className="opacity-60">↑</span>}
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${locked ? 'bg-emerald-400' : draft ? 'bg-amber-400' : editableMonths.includes(ym) ? 'bg-blue-300' : selected ? 'bg-gray-400' : 'bg-gray-300'}`} />
+                {monthShort(ym)}
               </button>
             );
           })}
@@ -149,13 +155,10 @@ export default function PaydayHome() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xl font-bold text-gray-900">{monthLabel(selectedMonth)}</div>
-              <div className={`text-xs mt-0.5 font-medium ${isLocked ? 'text-emerald-600' : isDraft ? 'text-amber-600' : selectedMonth > LOCKABLE_MONTH ? 'text-blue-400' : 'text-gray-400'}`}>
-                {isLocked ? '● Locked in' : isDraft ? '● In progress' : selectedMonth > LOCKABLE_MONTH ? '● Upcoming' : selectedMonth === LOCKABLE_MONTH ? 'Not yet set up' : 'No payday recorded'}
+              <div className={`text-xs mt-0.5 font-medium ${isLocked ? 'text-emerald-600' : isDraft ? 'text-amber-600' : isEditable ? 'text-blue-500' : 'text-gray-400'}`}>
+                {isLocked ? '● Locked in' : isDraft ? '● In progress' : isEditable ? '● Plan ahead' : 'No payday recorded'}
               </div>
             </div>
-            {!selectedSession && selectedMonth === LOCKABLE_MONTH && (
-              <Link href="/payday/session" className="bg-[#1a1a1a] text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">Set up payday →</Link>
-            )}
           </div>
 
           {detailLoading && <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>}
@@ -163,12 +166,13 @@ export default function PaydayHome() {
           {/* Locked session — read-only dashboard */}
           {isLocked && !detailLoading && detail && <LockedDashboard hh={hh} pots={pots} detail={detail} sessionId={selectedSession!.id} />}
 
-          {/* Draft / new session — inline editable */}
-          {(isDraft || (!selectedSession && selectedMonth === LOCKABLE_MONTH)) && !detailLoading && (
+          {/* Draft / new / future editable session — inline editable */}
+          {isEditable && !detailLoading && (
             <InlineEdit
               hh={hh} pots={pots}
               existingId={selectedSession?.id ?? null}
               detail={isDraft ? detail : null}
+              latestLockedDetail={(!selectedSession && selectedMonth !== curYM) ? latestLockedDetail : null}
               month={selectedMonth}
               onSaved={(newId) => {
                 refreshSessions(hh);
@@ -179,11 +183,12 @@ export default function PaydayHome() {
                 setSelectedMonth(selectedMonth);
                 loadDetail(newId);
               }}
+              onPotsChanged={(newPots) => setPots(newPots)}
             />
           )}
 
           {/* Empty past month */}
-          {!selectedSession && selectedMonth !== LOCKABLE_MONTH && !detailLoading && (
+          {!selectedSession && !isEditable && !detailLoading && (
             <div className="text-center py-16 text-gray-400"><div className="text-3xl mb-3">📅</div><p className="text-sm">No payday recorded for this month.</p></div>
           )}
         </div>
@@ -270,14 +275,18 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
 interface EditBill { _key: string; name: string; amount: string; }
 interface EditExtra { _key: string; name: string; amount: string; who: 'both' | 'a' | 'b'; }
 
-function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: {
+function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail, month, onSaved, onLocked, onPotsChanged }: {
   hh: Household; pots: Pot[];
   existingId: string | null;
   detail: SessionDetail | null;
+  latestLockedDetail: SessionDetail | null;
   month: string;
   onSaved: (id: string) => void;
   onLocked: (id: string) => void;
+  onPotsChanged: (pots: Pot[]) => void;
 }) {
+  const [pots, setPots] = useState<Pot[]>(initPots);
+  useEffect(() => { setPots(initPots); }, [initPots]);
   const isPartner = hh.mode === 'partner';
   const splitA = hh.joint_split_a; const splitB = 100 - splitA;
 
@@ -329,15 +338,43 @@ function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: 
       if (dAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dAvA*100));});
       if (dAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dAvB*100));});
     } else {
-      // Fresh session — pre-fill from household defaults
-      setSpendingA(hh.default_spending_a > 0 ? String(hh.default_spending_a) : '');
-      setSpendingB(hh.default_spending_b > 0 ? String(hh.default_spending_b) : '');
-      setTravelA(hh.default_transport_a > 0 ? String(hh.default_transport_a) : '');
-      setTravelB(hh.default_transport_b > 0 ? String(hh.default_transport_b) : '');
+      // No draft — try to pre-fill from latest locked session
+      const src = latestLockedDetail;
+      if (src) {
+        const s = src.session;
+        setIncomeA(s.income_a ? String(s.income_a) : '');
+        setIncomeB(s.income_b ? String(s.income_b) : '');
+        setSpendingA(s.spending_a ? String(s.spending_a) : '');
+        setSpendingB(s.spending_b ? String(s.spending_b) : '');
+        setTravelA(s.travel_a ? String(s.travel_a) : '');
+        setTravelB(s.travel_b ? String(s.travel_b) : '');
+        setJointBills(src.bills.filter(b=>b.category==='joint_fixed').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+        setBillsA(src.bills.filter(b=>b.category==='individual_a').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+        setBillsB(src.bills.filter(b=>b.category==='individual_b').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+        setDebtsA(src.bills.filter(b=>b.category==='debt_a').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+        setDebtsB(src.bills.filter(b=>b.category==='debt_b').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+        // Back-calc savings %
+        const allocs = src.allocations;
+        const dJF = src.bills.filter(b=>b.category==='joint_fixed').reduce((s,b)=>s+Number(b.amount),0);
+        const dExA = src.bills.reduce((s,b)=>b.category==='joint_extra'?s+Number(b.amount)*(splitA/100):b.category==='joint_extra_a'?s+Number(b.amount):s,0);
+        const dExB = src.bills.reduce((s,b)=>b.category==='joint_extra'?s+Number(b.amount)*(splitB/100):b.category==='joint_extra_b'?s+Number(b.amount):s,0);
+        const dPA = src.bills.filter(b=>['individual_a','debt_a'].includes(b.category)).reduce((s,b)=>s+Number(b.amount),0)+Number(s.spending_a)+Number(s.travel_a);
+        const dPB = src.bills.filter(b=>['individual_b','debt_b'].includes(b.category)).reduce((s,b)=>s+Number(b.amount),0)+Number(s.spending_b)+Number(s.travel_b);
+        const dAvA = Number(s.income_a)-(dJF*splitA/100)-dExA-dPA;
+        const dAvB = Number(s.income_b)-(dJF*splitB/100)-dExB-dPB;
+        if (dAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dAvA*100));});
+        if (dAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dAvB*100));});
+      } else {
+        // Truly fresh — pre-fill from household defaults
+        setSpendingA(hh.default_spending_a > 0 ? String(hh.default_spending_a) : '');
+        setSpendingB(hh.default_spending_b > 0 ? String(hh.default_spending_b) : '');
+        setTravelA(hh.default_transport_a > 0 ? String(hh.default_transport_a) : '');
+        setTravelB(hh.default_transport_b > 0 ? String(hh.default_transport_b) : '');
+      }
     }
     setPercentsA(pa); setPercentsB(pb);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detail]);
+  }, [detail, latestLockedDetail]);
 
   // Calculations
   const iA = parseFloat(incomeA)||0; const iB = parseFloat(incomeB)||0;
@@ -391,6 +428,42 @@ function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: 
     setSaving(false);
     if (lock && savedId) onLocked(savedId);
     else if (savedId) { setSaved(true); setTimeout(()=>setSaved(false),2000); onSaved(savedId); }
+  }
+
+  async function addPot(owner: 'person_a' | 'person_b', potType: 'short_term' | 'long_term', name: string) {
+    const colors = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6'];
+    const color = colors[pots.length % colors.length];
+    const res = await fetch('/api/payday/pots', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ householdId:hh.id, name, owner, potType, color, sortOrder:pots.length }) });
+    if (res.ok) {
+      const newPot: Pot = await res.json();
+      const updated = [...pots, newPot];
+      setPots(updated);
+      onPotsChanged(updated);
+      setPercentsA(p=>({...p,[newPot.id]:''}));
+      setPercentsB(p=>({...p,[newPot.id]:''}));
+    }
+  }
+
+  function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (owner: 'person_a'|'person_b', potType: 'short_term'|'long_term', name: string) => Promise<void> }) {
+    const [open, setOpen] = useState(false);
+    const [name, setName] = useState('');
+    const [type, setType] = useState<'short_term'|'long_term'>('short_term');
+    const [adding, setAdding] = useState(false);
+    if (!open) return <button onClick={()=>setOpen(true)} className="w-full border border-dashed border-gray-200 py-2 rounded-xl text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors mt-1">+ Add savings / investment pot</button>;
+    return (
+      <div className="mt-1 border border-gray-200 rounded-xl p-3 space-y-2">
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Pot name (e.g. ISA, Holiday)" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900" />
+        <div className="flex gap-2">
+          {(['short_term','long_term'] as const).map(t=>(
+            <button key={t} onClick={()=>setType(t)} className={`flex-1 text-xs py-1.5 rounded-lg border transition-colors ${type===t?'bg-[#1a1a1a] text-white border-[#1a1a1a]':'border-gray-200 text-gray-500'}`}>{t==='short_term'?'Short-term':'Long-term'}</button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={async()=>{if(!name.trim())return;setAdding(true);await onAdd(owner,type,name.trim());setName('');setOpen(false);setAdding(false);}} disabled={!name.trim()||adding} className="flex-1 text-xs bg-[#1a1a1a] text-white py-1.5 rounded-lg disabled:opacity-40">{adding?'Adding…':'Add pot'}</button>
+          <button onClick={()=>setOpen(false)} className="text-xs text-gray-400 px-3 py-1.5 rounded-lg border border-gray-200">Cancel</button>
+        </div>
+      </div>
+    );
   }
 
   function EInput({ label, value, onChange, dark }: { label: string; value: string; onChange: (v: string) => void; dark?: boolean }) {
@@ -495,7 +568,7 @@ function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: 
             <h3 className="font-semibold text-gray-900">👤 {hh.person_a_name}</h3>
             {iA>0 && <span className="text-sm text-gray-400">{fmt(iA)}</span>}
           </div>
-          {iA>0 && <div className="bg-blue-50 rounded-xl px-4 py-3 flex items-center justify-between"><div><div className="text-xs text-blue-600 font-medium">Transfer to joint account</div></div><div className="text-lg font-bold text-blue-700">{fmt(jointContribA)}</div></div>}
+          {isPartner && iA>0 && jointContribA>0 && <div className="text-xs text-gray-400 -mt-1">Joint contribution: {fmt(jointContribA)}</div>}
           <SLabel>Personal bills</SLabel>
           {billsA.map(b=><EditBillRow key={b._key} bill={b} onChange={(f,v)=>setBillsA(l=>l.map(x=>x._key===b._key?{...x,[f]:v}:x))} onRemove={()=>setBillsA(l=>l.filter(x=>x._key!==b._key))} />)}
           <AddBtn label="+ Add personal bill" onClick={()=>setBillsA(l=>[...l,{_key:uid(),name:'',amount:''}])} />
@@ -517,7 +590,7 @@ function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: 
               <h3 className="font-semibold text-gray-900">👤 {hh.person_b_name}</h3>
               {iB>0 && <span className="text-sm text-gray-400">{fmt(iB)}</span>}
             </div>
-            {iB>0 && <div className="bg-blue-50 rounded-xl px-4 py-3 flex items-center justify-between"><div><div className="text-xs text-blue-600 font-medium">Transfer to joint account</div></div><div className="text-lg font-bold text-blue-700">{fmt(jointContribB)}</div></div>}
+            {iB>0 && jointContribB>0 && <div className="text-xs text-gray-400 -mt-1">Joint contribution: {fmt(jointContribB)}</div>}
             <SLabel>Personal bills</SLabel>
             {billsB.map(b=><EditBillRow key={b._key} bill={b} onChange={(f,v)=>setBillsB(l=>l.map(x=>x._key===b._key?{...x,[f]:v}:x))} onRemove={()=>setBillsB(l=>l.filter(x=>x._key!==b._key))} />)}
             <AddBtn label="+ Add personal bill" onClick={()=>setBillsB(l=>[...l,{_key:uid(),name:'',amount:''}])} />
@@ -535,8 +608,8 @@ function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: 
       </div>
 
       {/* Savings */}
-      <div className={isPartner&&potsA.length>0&&potsB.length>0?'grid grid-cols-1 md:grid-cols-2 gap-4':''}>
-        {potsA.length>0 && (
+      <div className={isPartner?'grid grid-cols-1 md:grid-cols-2 gap-4':''}>
+        {(potsA.length>0||true) && (
           <DSection title={`${hh.person_a_name}'s savings`} icon="💰" subtitle={`Available: ${fmt(availableA)}`}>
             <div className="space-y-2">
               {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_a').length>0 && <SLabel>Short-term goals</SLabel>}
@@ -572,13 +645,14 @@ function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: 
                 );
               })}
             </div>
+            <AddPotRow owner="person_a" onAdd={addPot} />
             <div className={`flex justify-between text-xs mt-2 font-medium ${aReady?'text-emerald-600':Math.abs(100-allocPctA)<50?'text-gray-400':'text-amber-600'}`}>
               <span>{Math.round(allocPctA)}% allocated</span>
               <span>{aReady?'✓ All allocated':`${(100-allocPctA).toFixed(0)}% remaining`}</span>
             </div>
           </DSection>
         )}
-        {isPartner&&potsB.length>0 && (
+        {isPartner && (
           <DSection title={`${hh.person_b_name}'s savings`} icon="💰" subtitle={`Available: ${fmt(availableB)}`}>
             <div className="space-y-2">
               {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_b').length>0 && <SLabel>Short-term goals</SLabel>}
@@ -618,6 +692,7 @@ function InlineEdit({ hh, pots, existingId, detail, month, onSaved, onLocked }: 
               <span>{Math.round(allocPctB)}% allocated</span>
               <span>{bReady?'✓ All allocated':`${(100-allocPctB).toFixed(0)}% remaining`}</span>
             </div>
+            <AddPotRow owner="person_b" onAdd={addPot} />
           </DSection>
         )}
       </div>
