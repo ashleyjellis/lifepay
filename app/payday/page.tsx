@@ -5,31 +5,25 @@ import Link from 'next/link';
 
 export default function PaydayHome() {
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
   const [dbError, setDbError] = useState('');
 
   useEffect(() => {
     async function check() {
       try {
-        const res = await fetch('/api/payday/init', { method: 'POST' });
-        if (!res.ok) {
-          const data = await res.json();
+        const initRes = await fetch('/api/payday/init', { method: 'POST' });
+        if (!initRes.ok) {
+          const data = await initRes.json();
           setDbError(data.error ?? 'Database error');
-          setChecking(false);
           return;
         }
+        // Middleware already ensures user is logged in if they reach here.
+        // Just check if they have a household.
         const hRes = await fetch('/api/payday/households');
-        if (hRes.ok) {
-          const household = await hRes.json();
-          if (household) {
-            router.replace('/payday/session');
-          } else {
-            router.replace('/payday/setup');
-          }
-        }
+        if (hRes.status === 401) { router.replace('/payday/login'); return; }
+        const household = hRes.ok ? await hRes.json() : null;
+        router.replace(household ? '/payday/session' : '/payday/setup');
       } catch {
         setDbError('Could not connect to database. Check TURSO_DATABASE_URL and TURSO_AUTH_TOKEN.');
-        setChecking(false);
       }
     }
     check();

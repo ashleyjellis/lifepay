@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface Household {
@@ -38,6 +39,7 @@ function fmtDate(d: string) {
 }
 
 export default function HistoryPage() {
+  const router = useRouter();
   const [household, setHousehold] = useState<Household | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [pots, setPots] = useState<Pot[]>([]);
@@ -101,7 +103,10 @@ export default function HistoryPage() {
             <div className="text-xs text-gray-400">{household?.name}</div>
             <div className="font-semibold text-sm">History</div>
           </div>
-          <Link href="/payday/session" className="text-xs text-gray-400 hover:text-gray-600">← New session</Link>
+          <div className="flex gap-3 items-center">
+            <Link href="/payday/session" className="text-xs text-gray-400 hover:text-gray-600">← New session</Link>
+            <button onClick={async () => { await fetch('/api/payday/auth/logout', { method: 'POST' }); router.push('/payday/login'); }} className="text-xs text-gray-400 hover:text-gray-600">Sign out</button>
+          </div>
         </div>
       </header>
 

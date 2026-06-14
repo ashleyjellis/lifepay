@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -51,6 +52,7 @@ function today() {
 }
 
 export default function SessionPage() {
+  const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [household, setHousehold] = useState<Household | null>(null);
   const [savedBills, setSavedBills] = useState<Bill[]>([]);
@@ -58,6 +60,7 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
   // Step 1
   const [incomeA, setIncomeA] = useState('');
@@ -81,7 +84,17 @@ export default function SessionPage() {
   // Step 5 — savings allocations
   const [allocations, setAllocations] = useState<Record<string, string>>({});
 
+  async function logout() {
+    await fetch('/api/payday/auth/logout', { method: 'POST' });
+    router.push('/payday/login');
+  }
+
   const load = useCallback(async () => {
+    const meRes = await fetch('/api/payday/auth/me');
+    if (meRes.status === 401) { router.push('/payday/login'); return; }
+    const me = await meRes.json();
+    setUserEmail(me?.email ?? '');
+
     const hRes = await fetch('/api/payday/households');
     if (!hRes.ok) return;
     const hh: Household = await hRes.json();
@@ -193,6 +206,7 @@ export default function SessionPage() {
           <div className="flex gap-3 items-center">
             <Link href="/payday/history" className="text-xs text-gray-400 hover:text-gray-600">History</Link>
             <Link href="/payday/setup" className="text-xs text-gray-400 hover:text-gray-600">Setup</Link>
+            <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600" title={userEmail}>Sign out</button>
           </div>
         </div>
       </header>
