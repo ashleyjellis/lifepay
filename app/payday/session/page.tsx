@@ -253,20 +253,7 @@ export default function SessionPage() {
         </div>
       </header>
 
-      {locked ? (
-        <div className="max-w-lg mx-auto px-4 py-12 text-center space-y-4">
-          <div className="text-5xl">🎉</div>
-          <h2 className="text-2xl font-semibold">Payday sorted!</h2>
-          <p className="text-gray-500">Session locked. See you next payday.</p>
-          <div className="bg-white rounded-2xl p-6 text-left space-y-3 mt-6 border border-gray-100">
-            <div className="flex justify-between text-sm"><span className="text-gray-500">Total in</span><span className="font-medium">{fmt(totalIn)}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-500">All outgoings</span><span className="font-medium text-red-600">−{fmt(allOutgoings)}</span></div>
-            <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-3"><span>Allocated to savings</span><span className="text-emerald-600">{fmt(totalAvailable)}</span></div>
-          </div>
-          <Link href="/payday/history" className="inline-block mt-4 text-sm text-gray-500 hover:text-gray-700 underline">View history →</Link>
-        </div>
-      ) : (
-        <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
           {/* Progress */}
           <div className="flex gap-1.5">
             {([1,2,3,4,5] as Step[]).map(s => (
@@ -502,7 +489,6 @@ export default function SessionPage() {
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }
