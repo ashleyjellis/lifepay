@@ -31,17 +31,11 @@ function monthShort(ym: string) {
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
 }
 function toYM(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
-function getEditableMonths(paydayDay: number): string[] {
+function getEditableMonths(): string[] {
   const now = new Date();
-  const result: string[] = [toYM(now)];
-  for (let i = 1; i <= 3; i++) {
-    const futureMonth = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const unlockDate = new Date(futureMonth.getFullYear(), futureMonth.getMonth(), paydayDay - 14);
-    if (now >= unlockDate) result.push(toYM(futureMonth));
-  }
-  return result;
+  return [0, 1, 2].map(i => toYM(new Date(now.getFullYear(), now.getMonth() + i, 1)));
 }
-function generateMonths(sessionDates: string[], paydayDay: number): string[] {
+function generateMonths(sessionDates: string[]): string[] {
   const now = new Date();
   const months: string[] = [];
   for (let i = 12; i >= 1; i--) {
@@ -49,7 +43,7 @@ function generateMonths(sessionDates: string[], paydayDay: number): string[] {
     const m = toYM(d);
     if (sessionDates.some(sd => sd.startsWith(m))) months.push(m);
   }
-  const editable = getEditableMonths(paydayDay);
+  const editable = getEditableMonths();
   editable.forEach(m => { if (!months.includes(m)) months.push(m); });
   return months;
 }
@@ -109,10 +103,9 @@ export default function PaydayHome() {
 
   const hh = household;
   const isPartner = hh.mode === 'partner';
-  const paydayDay = hh.payday_day ?? 25;
   const curYM = toYM(new Date());
-  const editableMonths = getEditableMonths(paydayDay);
-  const months = generateMonths(sessions.map(s => s.date), paydayDay);
+  const editableMonths = getEditableMonths();
+  const months = generateMonths(sessions.map(s => s.date));
   const selectedSession = sessions.find(s => s.date.startsWith(selectedMonth));
   const isLocked = !!selectedSession?.locked_at;
   const isDraft = !!selectedSession && !selectedSession.locked_at;
