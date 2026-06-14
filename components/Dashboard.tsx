@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useAccounts, useBills, useEvents, useIncome, usePreferences } from '@/hooks/useStorage';
 import { forecastAtDay, runForecast } from '@/lib/forecast';
 import { formatCurrency, nextOccurrence } from '@/lib/format';
@@ -7,8 +8,65 @@ import { getPaydaySnapshots, addPaydaySnapshot } from '@/lib/storage';
 import { AmountText } from './AmountText';
 import { CardSkeleton } from './Skeleton';
 import { TrafficBadge } from './TrafficBadge';
-import type { TrafficLight } from '@/types';
+import type { Account, TrafficLight } from '@/types';
 import { format, addDays } from 'date-fns';
+
+type AccountTab = 'current' | 'savings' | 'investment' | 'credit' | 'loan' | 'mortgage';
+const ACCOUNT_TABS: { type: AccountTab; label: string }[] = [
+  { type: 'current', label: 'Current' },
+  { type: 'savings', label: 'Savings' },
+  { type: 'investment', label: 'Investments' },
+  { type: 'credit', label: 'Credit' },
+  { type: 'loan', label: 'Loans' },
+  { type: 'mortgage', label: 'Mortgage' },
+];
+
+function AccountTabPanel({ accounts, type }: { accounts: Account[]; type: AccountTab }) {
+  const filtered = accounts.filter(a => a.type === type);
+  const isDebt = type === 'credit' || type === 'loan' || type === 'mortgage';
+
+  if (filtered.length === 0) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-gray-400">No {type} accounts</p>
+        <Link href="/accounts" className="text-xs text-gray-900 font-medium underline mt-1 inline-block">Add one</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-gray-50">
+      {filtered.map(a => {
+        const display = Math.abs(a.balance);
+        return (
+          <div key={a.id} className="py-3 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium">{a.name}</p>
+              {a.provider && <p className="text-xs text-gray-400">{a.provider}{a.accountNumber ? ` · ${a.accountNumber}` : ''}</p>}
+              <div className="flex flex-wrap gap-1 mt-1">
+                {a.interestRate != null && <span className="text-xs bg-gray-100 rounded-full px-2 py-0.5 text-gray-500">{a.interestRate}%</span>}
+                {a.dealDescription && <span className="text-xs bg-amber-50 text-amber-700 rounded-full px-2 py-0.5">{a.dealDescription}</span>}
+                {a.dealEndDate && <span className="text-xs bg-amber-50 text-amber-700 rounded-full px-2 py-0.5">Deal ends {a.dealEndDate}</span>}
+                {a.termMonths != null && <span className="text-xs bg-gray-100 rounded-full px-2 py-0.5 text-gray-500">{a.termMonths}mo left</span>}
+              </div>
+            </div>
+            <div className="text-right">
+              <p className={`text-base font-bold ${isDebt ? 'text-[#A32D2D]' : 'text-gray-900'}`}>
+                {isDebt ? '-' : ''}{formatCurrency(display)}
+              </p>
+              {type === 'credit' && a.creditLimit && (
+                <p className="text-xs text-gray-400">{formatCurrency(a.creditLimit - display)} avail</p>
+              )}
+              {a.monthlyPayment != null && (
+                <p className="text-xs text-gray-400">{formatCurrency(a.monthlyPayment)}/mo</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function trafficLight(balance: number): TrafficLight {
   if (balance >= 1000) return 'green';
@@ -23,6 +81,7 @@ export function Dashboard() {
   const { events, loading: eLoading } = useEvents();
   const { prefs, loading: pLoading } = usePreferences();
 
+  const [accountTab, setAccountTab] = useState<AccountTab>('current');
   const [showPayday, setShowPayday] = useState(false);
   const [paydayInput, setPaydayInput] = useState('');
   const [paydaySummary, setPaydaySummary] = useState<{ forecast: number; actual: number } | null>(null);
@@ -104,7 +163,7 @@ export function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <h1 className="text-2xl font-bold">Home</h1>
 
       {paydaySummary && (
         <div className="bg-[#EAF3DE] border border-[#3B6D11]/20 rounded-xl p-4 text-sm text-[#3B6D11]">
@@ -113,7 +172,30 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Summary cards */}
+      {/* Account tabs */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex gap-1 overflow-x-auto p-2 border-b border-gray-100 scrollbar-hide">
+          {ACCOUNT_TABS.map(t => (
+            <button
+              key={t.type}
+              onClick={() => setAccountTab(t.type)}
+              className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                accountTab === t.type ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="px-4 pb-3">
+          <AccountTabPanel accounts={accounts} type={accountTab} />
+        </div>
+        <div className="px-4 py-2 border-t border-gray-50">
+          <Link href="/accounts" className="text-xs text-gray-400 hover:text-gray-700">Manage accounts →</Link>
+        </div>
+      </div>
+
+      {/* Quick summary strip */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 mb-1">Balance</p>

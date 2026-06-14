@@ -1,9 +1,19 @@
 export interface Account {
   id: string;
   name: string;
-  type: 'current' | 'savings' | 'credit';
+  type: 'current' | 'savings' | 'investment' | 'credit' | 'loan' | 'mortgage';
   balance: number;
+  provider?: string;
+  accountNumber?: string;
+  interestRate?: number; // % APR / AER
+  // Credit card
   creditLimit?: number;
+  dealEndDate?: string; // ISO date — end of promotional rate
+  dealDescription?: string; // e.g. "0% purchases"
+  // Loan / Mortgage
+  originalAmount?: number;
+  termMonths?: number; // months remaining
+  monthlyPayment?: number;
 }
 
 export interface Income {
