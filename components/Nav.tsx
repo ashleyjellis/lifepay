@@ -3,11 +3,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const tabs = [
-  { href: '/', label: 'Dashboard', icon: '🏠' },
+  { href: '/', label: 'Home', icon: '🏠' },
+  { href: '/accounts', label: 'Accounts', icon: '🏦' },
+  { href: '/summary', label: 'Summary', icon: '📊' },
+  { href: '/income', label: 'Income', icon: '💰' },
+  { href: '/bills', label: 'Bills', icon: '📄' },
   { href: '/forecast', label: 'Forecast', icon: '📈' },
   { href: '/tracker', label: 'Tracker', icon: '💳' },
   { href: '/events', label: 'Events', icon: '🎉' },
-  { href: '/bills', label: 'Bills', icon: '📄' },
   { href: '/ai', label: 'Ask AI', icon: '🤖' },
 ];
 
