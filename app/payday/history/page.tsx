@@ -104,7 +104,7 @@ export default function HistoryPage() {
             <div className="font-semibold text-sm">History</div>
           </div>
           <div className="flex gap-3 items-center">
-            <Link href="/payday/session" className="text-xs text-gray-400 hover:text-gray-600">← New session</Link>
+            <Link href="/payday/dashboard" className="text-xs text-gray-400 hover:text-gray-600">Dashboard</Link>
             <button onClick={async () => { await fetch('/api/payday/auth/logout', { method: 'POST' }); router.push('/payday/login'); }} className="text-xs text-gray-400 hover:text-gray-600">Sign out</button>
           </div>
         </div>

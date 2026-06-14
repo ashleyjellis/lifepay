@@ -77,6 +77,15 @@ export default function SessionPage() {
     if (!hh) { window.location.href = '/payday/setup'; return; }
     setHousehold(hh);
 
+    // Block duplicate sessions: if this month already has a locked session, go to its dashboard
+    const allRes = await fetch(`/api/payday/sessions?householdId=${hh.id}`);
+    if (allRes.ok) {
+      const allSessions: { id: string; date: string; locked_at: string | null }[] = await allRes.json();
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      const existing = allSessions.find(s => s.locked_at && s.date.startsWith(thisMonth));
+      if (existing) { router.replace(`/payday/dashboard/${existing.id}`); return; }
+    }
+
     const [bRes, pRes, dRes] = await Promise.all([
       fetch(`/api/payday/bills?householdId=${hh.id}`),
       fetch(`/api/payday/pots?householdId=${hh.id}`),
@@ -246,6 +255,7 @@ export default function SessionPage() {
             <div className="font-semibold text-sm">Payday — {today()}</div>
           </div>
           <div className="flex gap-3 items-center">
+            <Link href="/payday/dashboard" className="text-xs text-gray-400 hover:text-gray-600">Dashboard</Link>
             <Link href="/payday/history" className="text-xs text-gray-400 hover:text-gray-600">History</Link>
             <Link href="/payday/setup" className="text-xs text-gray-400 hover:text-gray-600">Setup</Link>
             <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600" title={userEmail}>Sign out</button>
