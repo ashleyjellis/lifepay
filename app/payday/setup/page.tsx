@@ -10,7 +10,7 @@ interface BillDraft { id: string; name: string; amount: string; }
 interface DebtDraft { id: string; name: string; amount: string; person: 'a' | 'b'; }
 interface PotDraft {
   id: string; name: string; targetAmount: string; targetMonths: string;
-  color: string; owner: 'person_a' | 'person_b'; potType: 'short_term' | 'long_term';
+  color: string; owner: 'person_a' | 'person_b' | 'joint'; potType: 'short_term' | 'long_term';
 }
 
 const POT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6','#64748b'];
@@ -136,11 +136,11 @@ export default function SetupPage() {
     else setDebtsB(d => d.filter(x => x.id !== id));
   }
 
-  function addShortTerm() {
-    setShortTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[p.length % POT_COLORS.length], owner: 'person_a', potType: 'short_term' }]);
+  function addShortTermFor(owner: 'person_a' | 'person_b' | 'joint') {
+    setShortTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[p.length % POT_COLORS.length], owner, potType: 'short_term' }]);
   }
-  function addLongTerm() {
-    setLongTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '', color: POT_COLORS[p.length % POT_COLORS.length], owner: 'person_a', potType: 'long_term' }]);
+  function addLongTermFor(owner: 'person_a' | 'person_b' | 'joint') {
+    setLongTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '', color: POT_COLORS[p.length % POT_COLORS.length], owner, potType: 'long_term' }]);
   }
   function updatePot(list: PotDraft[], set: (l: PotDraft[]) => void, id: string, field: keyof PotDraft, val: string) {
     set(list.map(p => p.id === id ? { ...p, [field]: val } : p));
@@ -484,29 +484,52 @@ export default function SetupPage() {
           <div className="space-y-6">
             <div>
               <h1 className="text-2xl font-semibold mb-1">Short-term Savings Goals</h1>
-              <p className="text-gray-500 text-sm">
-                Life events and near-future expenses — holidays, celebrations, big purchases. Set a target and a timeframe, and we&apos;ll show you the suggested monthly contribution.
-              </p>
+              <p className="text-gray-500 text-sm">Life events and near-future expenses — holidays, celebrations, big purchases.</p>
             </div>
 
-            <div className="space-y-3">
-              {shortTermPots.map(pot => (
-                <ShortTermPotRow
-                  key={pot.id}
-                  pot={pot}
-                  isPartner={isPartner}
-                  nameA={nameA || 'Person A'}
-                  nameB={nameB || 'Person B'}
-                  onUpdate={(field, val) => updatePot(shortTermPots, setShortTermPots, pot.id, field, val)}
-                  onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))}
-                />
-              ))}
-            </div>
-
-            <button onClick={addShortTerm}
-              className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">
-              + Add savings goal
-            </button>
+            {isPartner ? (
+              <>
+                {/* Person A section */}
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameA || 'Person A'}</div>
+                  {shortTermPots.filter(p => p.owner === 'person_a').map(pot => (
+                    <ShortTermPotRow key={pot.id} pot={pot}
+                      onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                      onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
+                  ))}
+                  <button onClick={() => addShortTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add goal for {nameA || 'Person A'}</button>
+                </div>
+                {/* Person B section */}
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameB || 'Person B'}</div>
+                  {shortTermPots.filter(p => p.owner === 'person_b').map(pot => (
+                    <ShortTermPotRow key={pot.id} pot={pot}
+                      onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                      onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
+                  ))}
+                  <button onClick={() => addShortTermFor('person_b')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add goal for {nameB || 'Person B'}</button>
+                </div>
+                {/* Joint section */}
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Joint</div>
+                  {shortTermPots.filter(p => p.owner === 'joint').map(pot => (
+                    <ShortTermPotRow key={pot.id} pot={pot}
+                      onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                      onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
+                  ))}
+                  <button onClick={() => addShortTermFor('joint')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add joint goal</button>
+                </div>
+              </>
+            ) : (
+              <>
+                {shortTermPots.map(pot => (
+                  <ShortTermPotRow key={pot.id} pot={pot}
+                    onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                    onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
+                ))}
+                <button onClick={() => addShortTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add savings goal</button>
+              </>
+            )}
 
             <NavButtons onBack={prev} onNext={next} nextLabel="Next: Long-term Savings →" />
           </div>
@@ -522,24 +545,49 @@ export default function SetupPage() {
               </p>
             </div>
 
-            <div className="space-y-3">
-              {longTermPots.map(pot => (
-                <LongTermPotRow
-                  key={pot.id}
-                  pot={pot}
-                  isPartner={isPartner}
-                  nameA={nameA || 'Person A'}
-                  nameB={nameB || 'Person B'}
-                  onUpdate={(field, val) => updatePot(longTermPots, setLongTermPots, pot.id, field, val)}
-                  onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))}
-                />
-              ))}
-            </div>
-
-            <button onClick={addLongTerm}
-              className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">
-              + Add account / platform
-            </button>
+            {isPartner ? (
+              <>
+                {/* Person A section */}
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameA || 'Person A'}</div>
+                  {longTermPots.filter(p => p.owner === 'person_a').map(pot => (
+                    <LongTermPotRow key={pot.id} pot={pot}
+                      onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                      onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
+                  ))}
+                  <button onClick={() => addLongTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account for {nameA || 'Person A'}</button>
+                </div>
+                {/* Person B section */}
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameB || 'Person B'}</div>
+                  {longTermPots.filter(p => p.owner === 'person_b').map(pot => (
+                    <LongTermPotRow key={pot.id} pot={pot}
+                      onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                      onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
+                  ))}
+                  <button onClick={() => addLongTermFor('person_b')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account for {nameB || 'Person B'}</button>
+                </div>
+                {/* Joint section */}
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Joint</div>
+                  {longTermPots.filter(p => p.owner === 'joint').map(pot => (
+                    <LongTermPotRow key={pot.id} pot={pot}
+                      onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                      onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
+                  ))}
+                  <button onClick={() => addLongTermFor('joint')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add joint account</button>
+                </div>
+              </>
+            ) : (
+              <>
+                {longTermPots.map(pot => (
+                  <LongTermPotRow key={pot.id} pot={pot}
+                    onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                    onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
+                ))}
+                <button onClick={() => addLongTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account / platform</button>
+              </>
+            )}
 
             <button
               onClick={finish}
@@ -646,8 +694,8 @@ function LifestylePersonBlock({ name, spending, onSpending, transport, onTranspo
   );
 }
 
-function ShortTermPotRow({ pot, isPartner, nameA, nameB, onUpdate, onRemove }: {
-  pot: PotDraft; isPartner: boolean; nameA: string; nameB: string;
+function ShortTermPotRow({ pot, onUpdate, onRemove }: {
+  pot: PotDraft;
   onUpdate: (f: keyof PotDraft, v: string) => void;
   onRemove: () => void;
 }) {
@@ -697,26 +745,12 @@ function ShortTermPotRow({ pot, isPartner, nameA, nameB, onUpdate, onRemove }: {
           → Save £{monthly}/month to reach your goal
         </div>
       )}
-
-      {isPartner && (
-        <div>
-          <label className="text-xs text-gray-400 mb-1 block">Who is this for?</label>
-          <div className="flex gap-2">
-            {([['person_a', nameA],['person_b', nameB]] as [string, string][]).map(([val, label]) => (
-              <button key={val} onClick={() => onUpdate('owner', val)}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${pot.owner === val ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function LongTermPotRow({ pot, isPartner, nameA, nameB, onUpdate, onRemove }: {
-  pot: PotDraft; isPartner: boolean; nameA: string; nameB: string;
+function LongTermPotRow({ pot, onUpdate, onRemove }: {
+  pot: PotDraft;
   onUpdate: (f: keyof PotDraft, v: string) => void;
   onRemove: () => void;
 }) {
@@ -745,20 +779,6 @@ function LongTermPotRow({ pot, isPartner, nameA, nameB, onUpdate, onRemove }: {
           />
         </div>
       </div>
-
-      {isPartner && (
-        <div>
-          <label className="text-xs text-gray-400 mb-1 block">Who is this for?</label>
-          <div className="flex gap-2">
-            {([['person_a', nameA],['person_b', nameB]] as [string, string][]).map(([val, label]) => (
-              <button key={val} onClick={() => onUpdate('owner', val)}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${pot.owner === val ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

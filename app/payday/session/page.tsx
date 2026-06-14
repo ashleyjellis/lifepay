@@ -72,6 +72,7 @@ export default function SessionPage() {
   // Step 5 — % allocations per person per pot
   const [percentsA, setPercentsA] = useState<Record<string, string>>({});
   const [percentsB, setPercentsB] = useState<Record<string, string>>({});
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   async function logout() {
     await fetch('/api/payday/auth/logout', { method: 'POST' });
@@ -92,9 +93,10 @@ export default function SessionPage() {
 
     // If the upcoming month's payday is already locked, redirect to its dashboard
     const allRes = await fetch(`/api/payday/sessions?householdId=${hh.id}`);
+    let allSessionsList: { id: string; date: string; locked_at: string | null; income_a: number; income_b: number; spending_a: number; spending_b: number; travel_a: number; travel_b: number }[] = [];
     if (allRes.ok) {
-      const allSessions: { id: string; date: string; locked_at: string | null }[] = await allRes.json();
-      const existing = allSessions.find(s => s.locked_at && s.date.startsWith(LOCKABLE_MONTH));
+      allSessionsList = await allRes.json();
+      const existing = allSessionsList.find(s => s.locked_at && s.date.startsWith(LOCKABLE_MONTH));
       if (existing) { router.replace(`/payday/dashboard/${existing.id}`); return; }
     }
 
@@ -135,9 +137,7 @@ export default function SessionPage() {
     pts.forEach(p => { pa[p.id] = ''; pb[p.id] = ''; });
 
     // Pre-populate income + savings % from the most recent locked session
-    const prevRes = await fetch(`/api/payday/sessions?householdId=${hh.id}`);
-    const allSess: { id: string; date: string; locked_at: string | null; income_a: number; income_b: number; spending_a: number; spending_b: number; travel_a: number; travel_b: number }[] = prevRes.ok ? await prevRes.json() : [];
-    const lastLocked = allSess.filter(s => s.locked_at).sort((a, b) => b.date.localeCompare(a.date))[0];
+    const lastLocked = allSessionsList.filter(s => s.locked_at).sort((a, b) => b.date.localeCompare(a.date))[0];
 
     if (lastLocked) {
       setIncomeA(String(lastLocked.income_a || ''));
@@ -187,6 +187,42 @@ export default function SessionPage() {
             }
           });
         }
+      }
+    }
+
+    // Override with draft session data if one exists for this month
+    const draft = allSessionsList.find(s => !s.locked_at && s.date.startsWith(LOCKABLE_MONTH));
+    if (draft) {
+      setSessionId(draft.id);
+      const draftRes = await fetch(`/api/payday/sessions?id=${draft.id}`);
+      if (draftRes.ok) {
+        const draftData = await draftRes.json();
+        const ds = draftData.session;
+        if (ds.income_a) setIncomeA(String(ds.income_a));
+        if (ds.income_b) setIncomeB(String(ds.income_b));
+        if (ds.spending_a) setSpendingA(String(ds.spending_a));
+        if (ds.spending_b) setSpendingB(String(ds.spending_b));
+        if (ds.travel_a) setTravelA(String(ds.travel_a));
+        if (ds.travel_b) setTravelB(String(ds.travel_b));
+        const draftExtras: ExtraLine[] = (draftData.bills as { name: string; amount: number; category: string }[])
+          .filter(b => ['joint_extra','joint_extra_a','joint_extra_b'].includes(b.category))
+          .map(b => ({ _key: uid(), name: b.name, amount: String(b.amount),
+            who: b.category === 'joint_extra_a' ? 'a' : b.category === 'joint_extra_b' ? 'b' : 'both' }));
+        if (draftExtras.length > 0) setExtras(draftExtras);
+        // Back-calculate savings % from draft allocations
+        const splitAn = hh.joint_split_a;
+        const splitBn = 100 - splitAn;
+        const dBills: { name: string; amount: number; category: string }[] = draftData.bills ?? [];
+        const dAllocs: { pot_id: string; amount: number }[] = draftData.allocations ?? [];
+        const dJF = dBills.filter(b => b.category === 'joint_fixed').reduce((s, b) => s + Number(b.amount), 0);
+        const dExA = dBills.reduce((s, b) => b.category === 'joint_extra' ? s + Number(b.amount) * (splitAn/100) : b.category === 'joint_extra_a' ? s + Number(b.amount) : s, 0);
+        const dExB = dBills.reduce((s, b) => b.category === 'joint_extra' ? s + Number(b.amount) * (splitBn/100) : b.category === 'joint_extra_b' ? s + Number(b.amount) : s, 0);
+        const dPA = dBills.filter(b => ['individual_a','debt_a'].includes(b.category)).reduce((s,b)=>s+Number(b.amount),0) + Number(ds.spending_a) + Number(ds.travel_a);
+        const dPB = dBills.filter(b => ['individual_b','debt_b'].includes(b.category)).reduce((s,b)=>s+Number(b.amount),0) + Number(ds.spending_b) + Number(ds.travel_b);
+        const dAvA = Number(ds.income_a) - (dJF * splitAn/100) - dExA - dPA;
+        const dAvB = Number(ds.income_b) - (dJF * splitBn/100) - dExB - dPB;
+        if (dAvA > 0) dAllocs.forEach(a => { const pot = pts.find(p => p.id === a.pot_id); if (pot?.owner === 'person_a') pa[a.pot_id] = String(Math.round(Number(a.amount)/dAvA*100)); });
+        if (dAvB > 0) dAllocs.forEach(a => { const pot = pts.find(p => p.id === a.pot_id); if (pot?.owner === 'person_b') pb[a.pot_id] = String(Math.round(Number(a.amount)/dAvB*100)); });
       }
     }
 
@@ -265,7 +301,7 @@ export default function SessionPage() {
     setList(list.map(b => b._key === key ? { ...b, amount: parseFloat(val) || 0 } : b));
   }
 
-  async function lockSession() {
+  async function saveSession(lock: boolean) {
     setSaving(true);
     const allBills: SessionBill[] = [
       ...jointBills,
@@ -277,33 +313,39 @@ export default function SessionPage() {
       ...indivBillsA, ...indivBillsB,
       ...sessionDebtsA, ...sessionDebtsB,
     ];
-
-    // Build allocations — joint pots combine A+B contributions
     const allocMap: Record<string, number> = {};
-    potsForA.forEach(p => {
-      const amt = potAmountA(p.id);
-      if (amt > 0) allocMap[p.id] = (allocMap[p.id] ?? 0) + amt;
-    });
+    potsForA.forEach(p => { const amt = potAmountA(p.id); if (amt > 0) allocMap[p.id] = (allocMap[p.id] ?? 0) + amt; });
     if (isPartner) {
-      potsForB.forEach(p => {
-        const amt = potAmountB(p.id);
-        if (amt > 0) allocMap[p.id] = (allocMap[p.id] ?? 0) + amt;
-      });
+      potsForB.forEach(p => { const amt = potAmountB(p.id); if (amt > 0) allocMap[p.id] = (allocMap[p.id] ?? 0) + amt; });
     }
     const allAllocs = Object.entries(allocMap).map(([potId, amount]) => ({ potId, amount }));
-
-    const res = await fetch('/api/payday/sessions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        householdId: hh!.id, date: `${LOCKABLE_MONTH}-01`,
-        incomeA: iA, incomeB: iB, startingBalance: 0,
-        spendingA: parseFloat(spendingA) || 0, spendingB: parseFloat(spendingB) || 0,
-        travelA: parseFloat(travelA) || 0, travelB: parseFloat(travelB) || 0,
-        bills: allBills, allocations: allAllocs, lock: true,
-      }),
-    });
-    const data = await res.json();
-    router.push(`/payday/dashboard/${data.id}`);
+    const payload = {
+      householdId: hh!.id, date: `${LOCKABLE_MONTH}-01`,
+      incomeA: iA, incomeB: iB, startingBalance: 0,
+      spendingA: parseFloat(spendingA) || 0, spendingB: parseFloat(spendingB) || 0,
+      travelA: parseFloat(travelA) || 0, travelB: parseFloat(travelB) || 0,
+      bills: allBills, allocations: allAllocs, lock,
+    };
+    if (sessionId) {
+      await fetch('/api/payday/sessions', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sessionId, ...payload }),
+      });
+      if (lock) router.push(`/payday/dashboard/${sessionId}`);
+      else setSaving(false);
+    } else {
+      const res = await fetch('/api/payday/sessions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (lock) {
+        router.push(`/payday/dashboard/${data.id}`);
+      } else {
+        setSessionId(data.id);
+        setSaving(false);
+      }
+    }
   }
 
   if (loading) return (
@@ -324,8 +366,7 @@ export default function SessionPage() {
             <div className="font-semibold text-sm">{budgetMonthLabel} Payday</div>
           </div>
           <div className="flex gap-3 items-center">
-            <Link href="/payday/dashboard" className="text-xs text-gray-400 hover:text-gray-600">Dashboard</Link>
-            <Link href="/payday/history" className="text-xs text-gray-400 hover:text-gray-600">History</Link>
+            <button onClick={async () => { await saveSession(false); router.push('/payday'); }} disabled={saving} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-40">Save draft</button>
             <Link href="/payday/setup" className="text-xs text-gray-400 hover:text-gray-600">Setup</Link>
             <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600" title={userEmail}>Sign out</button>
           </div>
@@ -559,8 +600,12 @@ export default function SessionPage() {
               )}
 
               <div className="flex gap-3">
-                <button onClick={() => setStep(4)} className="flex-1 border border-gray-200 py-3.5 rounded-xl text-sm font-medium hover:border-gray-400">← Back</button>
-                <button onClick={lockSession} disabled={!canLock || saving}
+                <button onClick={() => setStep(4)} className="border border-gray-200 px-4 py-3.5 rounded-xl text-sm font-medium hover:border-gray-400">← Back</button>
+                <button onClick={() => saveSession(false)} disabled={saving}
+                  className="flex-1 border border-gray-200 py-3.5 rounded-xl text-sm font-medium hover:border-gray-400 disabled:opacity-40">
+                  {saving ? 'Saving...' : 'Save for later'}
+                </button>
+                <button onClick={() => saveSession(true)} disabled={!canLock || saving}
                   className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-medium disabled:opacity-40 hover:bg-emerald-700 transition-colors">
                   {saving ? 'Saving...' : 'Lock in 🔒'}
                 </button>
@@ -685,29 +730,6 @@ function PersonSavingsSection({ name, available, pots, percents, setPercents, re
   const shortTerm = pots.filter(p => p.pot_type === 'short_term');
   const longTerm = pots.filter(p => p.pot_type !== 'short_term');
 
-  function PotRow({ pot }: { pot: Pot }) {
-    const pct = parseFloat(percents[pot.id]) || 0;
-    const amount = available * (pct / 100);
-    return (
-      <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
-        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: pot.color }} />
-        <span className="text-sm flex-1 text-gray-700 min-w-0 truncate">{pot.name}</span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <div className="relative w-20">
-            <input type="number" min="0" max="100"
-              className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right"
-              placeholder="0" value={percents[pot.id] ?? ''}
-              onChange={e => setPercents({ ...percents, [pot.id]: e.target.value })} />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
-          </div>
-          <span className="text-xs text-gray-400 w-16 text-right tabular-nums">
-            {amount > 0 ? fmt2(amount) : '—'}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-4">
       {name && <div className="font-semibold text-sm text-gray-700 border-b border-gray-100 pb-2">{name}</div>}
@@ -730,18 +752,56 @@ function PersonSavingsSection({ name, available, pots, percents, setPercents, re
         </div>
       </div>
 
-      {/* Pot rows */}
+      {/* Pot rows — inlined to avoid remount bug with nested components */}
       <div className="space-y-3">
         {shortTerm.length > 0 && (
           <div className="space-y-1.5">
             <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">Short-term goals</div>
-            {shortTerm.map(p => <PotRow key={p.id} pot={p} />)}
+            {shortTerm.map(p => {
+              const pct = parseFloat(percents[p.id]) || 0;
+              const amount = available * (pct / 100);
+              return (
+                <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.color }} />
+                  <span className="text-sm flex-1 text-gray-700 min-w-0 truncate">{p.name}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="relative w-20">
+                      <input type="number" min="0" max="100"
+                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right"
+                        placeholder="0" value={percents[p.id] ?? ''}
+                        onChange={e => setPercents({ ...percents, [p.id]: e.target.value })} />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+                    </div>
+                    <span className="text-xs text-gray-400 w-16 text-right tabular-nums">{amount > 0 ? fmt2(amount) : '—'}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         {longTerm.length > 0 && (
           <div className="space-y-1.5">
             <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">Long-term savings</div>
-            {longTerm.map(p => <PotRow key={p.id} pot={p} />)}
+            {longTerm.map(p => {
+              const pct = parseFloat(percents[p.id]) || 0;
+              const amount = available * (pct / 100);
+              return (
+                <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.color }} />
+                  <span className="text-sm flex-1 text-gray-700 min-w-0 truncate">{p.name}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="relative w-20">
+                      <input type="number" min="0" max="100"
+                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right"
+                        placeholder="0" value={percents[p.id] ?? ''}
+                        onChange={e => setPercents({ ...percents, [p.id]: e.target.value })} />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+                    </div>
+                    <span className="text-xs text-gray-400 w-16 text-right tabular-nums">{amount > 0 ? fmt2(amount) : '—'}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         {pots.length === 0 && (

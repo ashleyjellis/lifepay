@@ -133,6 +133,9 @@ export default function DashboardPage() {
   const totalSavingsA = potAllocsA.reduce((s, a) => s + Number(a.amount), 0);
   const totalSavingsB = potAllocsB.reduce((s, a) => s + Number(a.amount), 0);
 
+  const availableA = Number(session.income_a) - jointContribA - personalTotalA;
+  const availableB = Number(session.income_b) - jointContribB - personalTotalB;
+
   // Prev/next sessions
   const idx = allSessions.findIndex(s => s.id === id);
   const prevSession = idx < allSessions.length - 1 ? allSessions[idx + 1] : null;
@@ -296,6 +299,7 @@ export default function DashboardPage() {
                 allocs={potAllocsA}
                 potMap={potMap}
                 total={totalSavingsA}
+                available={availableA}
               />
             )}
             {isPartner && potAllocsB.length > 0 && (
@@ -304,6 +308,7 @@ export default function DashboardPage() {
                 allocs={potAllocsB}
                 potMap={potMap}
                 total={totalSavingsB}
+                available={availableB}
               />
             )}
           </div>
@@ -481,11 +486,12 @@ function PersonSection({ name, income, jointContrib, personalBills, debts, spend
   );
 }
 
-function SavingsSection({ name, allocs, potMap, total }: {
+function SavingsSection({ name, allocs, potMap, total, available }: {
   name: string;
   allocs: Allocation[];
   potMap: Record<string, Pot>;
   total: number;
+  available: number;
 }) {
   const fmt2 = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(Math.abs(v));
   return (
@@ -505,6 +511,7 @@ function SavingsSection({ name, allocs, potMap, total }: {
             <div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: pot.color }} />
               <span className="text-sm flex-1 text-gray-700">{pot.name}</span>
+              <span className="text-xs text-gray-400 w-10 text-right">{available > 0 ? `${Math.round((Number(a.amount) / available) * 100)}%` : ''}</span>
               <span className="text-sm font-semibold text-emerald-700">{fmt2(Number(a.amount))}</span>
             </div>
           );
