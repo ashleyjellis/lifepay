@@ -14,6 +14,8 @@ const tabs = [
 export function Nav() {
   const pathname = usePathname();
 
+  if (pathname.startsWith('/payday')) return null;
+
   return (
     <>
       {/* Sidebar for md+ */}
@@ -33,6 +35,15 @@ export function Nav() {
             {t.label}
           </Link>
         ))}
+        <div className="mt-auto pt-4 border-t border-gray-100">
+          <Link
+            href="/payday"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <span>💰</span>
+            Ashley&apos;s Budgeting System
+          </Link>
+        </div>
       </nav>
 
       {/* Bottom bar for mobile */}
