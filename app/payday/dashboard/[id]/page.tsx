@@ -127,13 +127,11 @@ export default function DashboardPage() {
 
   // Savings per pot / per person
   const potMap = Object.fromEntries(pots.map(p => [p.id, p]));
-  const jointPotAllocs = allocations.filter(a => potMap[a.pot_id]?.owner === 'joint');
   const potAllocsA = allocations.filter(a => potMap[a.pot_id]?.owner === 'person_a');
   const potAllocsB = allocations.filter(a => potMap[a.pot_id]?.owner === 'person_b');
 
   const totalSavingsA = potAllocsA.reduce((s, a) => s + Number(a.amount), 0);
   const totalSavingsB = potAllocsB.reduce((s, a) => s + Number(a.amount), 0);
-  const totalJointSavings = jointPotAllocs.reduce((s, a) => s + Number(a.amount), 0);
 
   // Prev/next sessions
   const idx = allSessions.findIndex(s => s.id === id);
@@ -293,29 +291,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Joint savings */}
-        {jointPotAllocs.length > 0 && (
-          <Section title="Joint savings" icon="💰" subtitle="Contributions from both people this month">
-            <div className="space-y-1">
-              {jointPotAllocs.map(a => {
-                const pot = potMap[a.pot_id];
-                if (!pot) return null;
-                return (
-                  <div key={a.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: pot.color }} />
-                    <span className="text-sm flex-1 text-gray-700">{pot.name}</span>
-                    <span className="text-sm font-semibold">{fmt(Number(a.amount))}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-3 mt-3">
-              <span className="text-gray-600">Total joint savings</span>
-              <span className="text-emerald-600">{fmt(totalJointSavings)}</span>
-            </div>
-          </Section>
-        )}
-
         {/* Bottom recap */}
         <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
           <div className="text-sm font-semibold text-gray-700 mb-3">Month at a glance</div>
@@ -323,11 +298,11 @@ export default function DashboardPage() {
           <RecapRow label="Joint outgoings" value={fmt(jointFixed.reduce((s, b) => s + Number(b.amount), 0) + jointExtras.reduce((s, b) => s + Number(b.amount), 0))} negative />
           <RecapRow label={`${hh.person_a_name}'s personal`} value={fmt(personalTotalA)} negative />
           {isPartner && <RecapRow label={`${hh.person_b_name}'s personal`} value={fmt(personalTotalB)} negative />}
-          <RecapRow label="Saved / invested" value={fmt(totalSavingsA + totalSavingsB + totalJointSavings)} positive />
+          <RecapRow label="Saved / invested" value={fmt(totalSavingsA + totalSavingsB)} positive />
           <div className="border-t border-gray-100 pt-3">
             <RecapRow
               label="Savings rate"
-              value={`${Math.round(((totalSavingsA + totalSavingsB + totalJointSavings) / (Number(session.income_a) + Number(session.income_b))) * 100)}%`}
+              value={`${Math.round(((totalSavingsA + totalSavingsB) / (Number(session.income_a) + Number(session.income_b))) * 100)}%`}
               positive
               bold
             />

@@ -10,7 +10,7 @@ interface BillDraft { id: string; name: string; amount: string; }
 interface DebtDraft { id: string; name: string; amount: string; person: 'a' | 'b'; }
 interface PotDraft {
   id: string; name: string; targetAmount: string; targetMonths: string;
-  color: string; owner: 'person_a' | 'person_b' | 'joint'; potType: 'short_term' | 'long_term';
+  color: string; owner: 'person_a' | 'person_b'; potType: 'short_term' | 'long_term';
 }
 
 const POT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6','#64748b'];
@@ -30,6 +30,7 @@ const DEFAULT_SHORT_TERM: Omit<PotDraft, 'owner'>[] = [
   { id: 'st2', name: 'Holiday', targetAmount: '', targetMonths: '12', color: '#f59e0b', potType: 'short_term' },
   { id: 'st3', name: 'Short-term savings', targetAmount: '', targetMonths: '12', color: '#10b981', potType: 'short_term' },
 ];
+// Savings pots are always per-person — no joint savings
 
 const DEFAULT_LONG_TERM: Omit<PotDraft, 'owner'>[] = [
   { id: 'lt1', name: 'ISA', targetAmount: '', targetMonths: '', color: '#6366f1', potType: 'long_term' },
@@ -95,12 +96,12 @@ export default function SetupPage() {
 
   // Short-term savings
   const [shortTermPots, setShortTermPots] = useState<PotDraft[]>(
-    DEFAULT_SHORT_TERM.map(p => ({ ...p, owner: 'joint' as const }))
+    DEFAULT_SHORT_TERM.map(p => ({ ...p, owner: 'person_a' as const }))
   );
 
   // Long-term savings
   const [longTermPots, setLongTermPots] = useState<PotDraft[]>(
-    DEFAULT_LONG_TERM.map(p => ({ ...p, owner: 'joint' as const }))
+    DEFAULT_LONG_TERM.map(p => ({ ...p, owner: 'person_a' as const }))
   );
 
   const splitB = 100 - (parseInt(splitA) || 50);
@@ -136,10 +137,10 @@ export default function SetupPage() {
   }
 
   function addShortTerm() {
-    setShortTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[p.length % POT_COLORS.length], owner: 'joint', potType: 'short_term' }]);
+    setShortTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[p.length % POT_COLORS.length], owner: 'person_a', potType: 'short_term' }]);
   }
   function addLongTerm() {
-    setLongTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '', color: POT_COLORS[p.length % POT_COLORS.length], owner: 'joint', potType: 'long_term' }]);
+    setLongTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '', color: POT_COLORS[p.length % POT_COLORS.length], owner: 'person_a', potType: 'long_term' }]);
   }
   function updatePot(list: PotDraft[], set: (l: PotDraft[]) => void, id: string, field: keyof PotDraft, val: string) {
     set(list.map(p => p.id === id ? { ...p, [field]: val } : p));
@@ -701,7 +702,7 @@ function ShortTermPotRow({ pot, isPartner, nameA, nameB, onUpdate, onRemove }: {
         <div>
           <label className="text-xs text-gray-400 mb-1 block">Who is this for?</label>
           <div className="flex gap-2">
-            {([['joint','Both'],['person_a', nameA],['person_b', nameB]] as [string, string][]).map(([val, label]) => (
+            {([['person_a', nameA],['person_b', nameB]] as [string, string][]).map(([val, label]) => (
               <button key={val} onClick={() => onUpdate('owner', val)}
                 className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${pot.owner === val ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
                 {label}
@@ -749,7 +750,7 @@ function LongTermPotRow({ pot, isPartner, nameA, nameB, onUpdate, onRemove }: {
         <div>
           <label className="text-xs text-gray-400 mb-1 block">Who is this for?</label>
           <div className="flex gap-2">
-            {([['joint','Both'],['person_a', nameA],['person_b', nameB]] as [string, string][]).map(([val, label]) => (
+            {([['person_a', nameA],['person_b', nameB]] as [string, string][]).map(([val, label]) => (
               <button key={val} onClick={() => onUpdate('owner', val)}
                 className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${pot.owner === val ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
                 {label}

@@ -25,7 +25,20 @@ const fmt = (v: number) =>
 const fmtShort = (v: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(v);
 function uid() { return Math.random().toString(36).slice(2); }
-function today() { return new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); }
+
+function getLockableMonth() {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(ym: string) {
+  const [y, m] = ym.split('-');
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+const LOCKABLE_MONTH = getLockableMonth();
+const budgetMonthLabel = monthLabel(LOCKABLE_MONTH);
 
 export default function SessionPage() {
   const router = useRouter();
@@ -77,12 +90,11 @@ export default function SessionPage() {
     if (!hh) { window.location.href = '/payday/setup'; return; }
     setHousehold(hh);
 
-    // Block duplicate sessions: if this month already has a locked session, go to its dashboard
+    // If the upcoming month's payday is already locked, redirect to its dashboard
     const allRes = await fetch(`/api/payday/sessions?householdId=${hh.id}`);
     if (allRes.ok) {
       const allSessions: { id: string; date: string; locked_at: string | null }[] = await allRes.json();
-      const thisMonth = new Date().toISOString().slice(0, 7);
-      const existing = allSessions.find(s => s.locked_at && s.date.startsWith(thisMonth));
+      const existing = allSessions.find(s => s.locked_at && s.date.startsWith(LOCKABLE_MONTH));
       if (existing) { router.replace(`/payday/dashboard/${existing.id}`); return; }
     }
 
@@ -226,7 +238,7 @@ export default function SessionPage() {
     const res = await fetch('/api/payday/sessions', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        householdId: hh!.id, date: new Date().toISOString().slice(0, 10),
+        householdId: hh!.id, date: `${LOCKABLE_MONTH}-01`,
         incomeA: iA, incomeB: iB, startingBalance: 0,
         spendingA: parseFloat(spendingA) || 0, spendingB: parseFloat(spendingB) || 0,
         travelA: parseFloat(travelA) || 0, travelB: parseFloat(travelB) || 0,
@@ -252,7 +264,7 @@ export default function SessionPage() {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div>
             <div className="text-xs text-gray-400">{hh!.name}</div>
-            <div className="font-semibold text-sm">Payday — {today()}</div>
+            <div className="font-semibold text-sm">{budgetMonthLabel} Payday</div>
           </div>
           <div className="flex gap-3 items-center">
             <Link href="/payday/dashboard" className="text-xs text-gray-400 hover:text-gray-600">Dashboard</Link>
