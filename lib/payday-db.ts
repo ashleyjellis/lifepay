@@ -14,6 +14,8 @@ export function getDb() {
 
 export async function initSchema() {
   const db = getDb();
+
+  // Base tables — safe to re-run (IF NOT EXISTS)
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -33,13 +35,17 @@ export async function initSchema() {
 
     CREATE TABLE IF NOT EXISTS households (
       id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
+      user_id TEXT NOT NULL DEFAULT '',
       name TEXT NOT NULL,
       mode TEXT NOT NULL CHECK(mode IN ('solo','partner')),
       person_a_name TEXT NOT NULL DEFAULT 'Person A',
       person_b_name TEXT NOT NULL DEFAULT 'Person B',
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      joint_split_a INTEGER NOT NULL DEFAULT 50,
+      default_spending_a REAL NOT NULL DEFAULT 0,
+      default_spending_b REAL NOT NULL DEFAULT 0,
+      default_transport_a REAL NOT NULL DEFAULT 0,
+      default_transport_b REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS bills (
@@ -47,7 +53,17 @@ export async function initSchema() {
       household_id TEXT NOT NULL,
       name TEXT NOT NULL,
       amount REAL NOT NULL,
-      category TEXT NOT NULL CHECK(category IN ('joint_fixed','joint_extra','individual_a','individual_b')),
+      category TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (household_id) REFERENCES households(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS debt_repayments (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL,
+      person TEXT NOT NULL CHECK(person IN ('a','b')),
+      name TEXT NOT NULL,
+      amount REAL NOT NULL,
       active INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (household_id) REFERENCES households(id)
     );
@@ -57,7 +73,10 @@ export async function initSchema() {
       household_id TEXT NOT NULL,
       name TEXT NOT NULL,
       target_amount REAL,
+      target_months INTEGER,
       color TEXT NOT NULL DEFAULT '#6366f1',
+      owner TEXT NOT NULL DEFAULT 'joint',
+      pot_type TEXT NOT NULL DEFAULT 'short_term',
       sort_order INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (household_id) REFERENCES households(id)
     );
@@ -96,4 +115,21 @@ export async function initSchema() {
       FOREIGN KEY (pot_id) REFERENCES savings_pots(id)
     );
   `);
+
+  // Migrations — each wrapped so re-runs are safe
+  const migrations = [
+    'ALTER TABLE households ADD COLUMN user_id TEXT NOT NULL DEFAULT ""',
+    'ALTER TABLE households ADD COLUMN joint_split_a INTEGER NOT NULL DEFAULT 50',
+    'ALTER TABLE households ADD COLUMN default_spending_a REAL NOT NULL DEFAULT 0',
+    'ALTER TABLE households ADD COLUMN default_spending_b REAL NOT NULL DEFAULT 0',
+    'ALTER TABLE households ADD COLUMN default_transport_a REAL NOT NULL DEFAULT 0',
+    'ALTER TABLE households ADD COLUMN default_transport_b REAL NOT NULL DEFAULT 0',
+    'ALTER TABLE savings_pots ADD COLUMN owner TEXT NOT NULL DEFAULT "joint"',
+    'ALTER TABLE savings_pots ADD COLUMN pot_type TEXT NOT NULL DEFAULT "short_term"',
+    'ALTER TABLE savings_pots ADD COLUMN target_months INTEGER',
+  ];
+
+  for (const sql of migrations) {
+    try { await db.execute(sql); } catch { /* already exists */ }
+  }
 }

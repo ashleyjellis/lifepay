@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   if (!householdId || !(await assertHousehold(householdId, user.id))) return NextResponse.json([], { status: 403 });
   const db = getDb();
   const result = await db.execute({
-    sql: 'SELECT * FROM savings_pots WHERE household_id=? ORDER BY sort_order, name',
+    sql: 'SELECT * FROM debt_repayments WHERE household_id=? AND active=1 ORDER BY person, name',
     args: [householdId],
   });
   return NextResponse.json(result.rows);
@@ -31,35 +31,11 @@ export async function POST(req: Request) {
   const db = getDb();
   const id = randomUUID();
   await db.execute({
-    sql: 'INSERT INTO savings_pots (id, household_id, name, target_amount, target_months, color, owner, pot_type, sort_order) VALUES (?,?,?,?,?,?,?,?,?)',
-    args: [
-      id, body.householdId, body.name,
-      body.targetAmount ?? null,
-      body.targetMonths ?? null,
-      body.color ?? '#6366f1',
-      body.owner ?? 'joint',
-      body.potType ?? 'short_term',
-      body.sortOrder ?? 0,
-    ],
+    sql: 'INSERT INTO debt_repayments (id, household_id, person, name, amount, active) VALUES (?,?,?,?,?,1)',
+    args: [id, body.householdId, body.person, body.name, body.amount],
   });
-  const result = await db.execute({ sql: 'SELECT * FROM savings_pots WHERE id=?', args: [id] });
+  const result = await db.execute({ sql: 'SELECT * FROM debt_repayments WHERE id=?', args: [id] });
   return NextResponse.json(result.rows[0]);
-}
-
-export async function PUT(req: Request) {
-  const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
-  const body = await req.json();
-  const db = getDb();
-  const pot = await db.execute({ sql: 'SELECT household_id FROM savings_pots WHERE id=?', args: [body.id] });
-  if (!pot.rows[0] || !(await assertHousehold(pot.rows[0].household_id as string, user.id))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  await db.execute({
-    sql: 'UPDATE savings_pots SET name=?, target_amount=?, target_months=?, color=?, owner=?, pot_type=?, sort_order=? WHERE id=?',
-    args: [body.name, body.targetAmount ?? null, body.targetMonths ?? null, body.color, body.owner ?? 'joint', body.potType ?? 'short_term', body.sortOrder ?? 0, body.id],
-  });
-  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: Request) {
@@ -69,10 +45,10 @@ export async function DELETE(req: Request) {
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   const db = getDb();
-  const pot = await db.execute({ sql: 'SELECT household_id FROM savings_pots WHERE id=?', args: [id] });
-  if (!pot.rows[0] || !(await assertHousehold(pot.rows[0].household_id as string, user.id))) {
+  const r = await db.execute({ sql: 'SELECT household_id FROM debt_repayments WHERE id=?', args: [id] });
+  if (!r.rows[0] || !(await assertHousehold(r.rows[0].household_id as string, user.id))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  await db.execute({ sql: 'DELETE FROM savings_pots WHERE id=?', args: [id] });
+  await db.execute({ sql: 'DELETE FROM debt_repayments WHERE id=?', args: [id] });
   return NextResponse.json({ ok: true });
 }

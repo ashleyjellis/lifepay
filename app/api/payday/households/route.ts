@@ -28,8 +28,23 @@ export async function POST(req: Request) {
   const id = randomUUID();
   const now = new Date().toISOString();
   await db.execute({
-    sql: 'INSERT INTO households (id, user_id, name, mode, person_a_name, person_b_name, created_at) VALUES (?,?,?,?,?,?,?)',
-    args: [id, user.id, body.name, body.mode, body.personAName ?? 'Person A', body.personBName ?? 'Person B', now],
+    sql: `INSERT INTO households
+            (id, user_id, name, mode, person_a_name, person_b_name,
+             joint_split_a, default_spending_a, default_spending_b,
+             default_transport_a, default_transport_b, created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    args: [
+      id, user.id,
+      body.name, body.mode,
+      body.personAName ?? 'Person A',
+      body.personBName ?? 'Person B',
+      body.jointSplitA ?? 50,
+      body.defaultSpendingA ?? 0,
+      body.defaultSpendingB ?? 0,
+      body.defaultTransportA ?? 0,
+      body.defaultTransportB ?? 0,
+      now,
+    ],
   });
   const result = await db.execute({ sql: 'SELECT * FROM households WHERE id=?', args: [id] });
   return NextResponse.json(result.rows[0]);
@@ -41,8 +56,21 @@ export async function PUT(req: Request) {
   const body = await req.json();
   const db = getDb();
   await db.execute({
-    sql: 'UPDATE households SET name=?, mode=?, person_a_name=?, person_b_name=? WHERE id=? AND user_id=?',
-    args: [body.name, body.mode, body.personAName, body.personBName, body.id, user.id],
+    sql: `UPDATE households SET
+            name=?, mode=?, person_a_name=?, person_b_name=?,
+            joint_split_a=?, default_spending_a=?, default_spending_b=?,
+            default_transport_a=?, default_transport_b=?
+          WHERE id=? AND user_id=?`,
+    args: [
+      body.name, body.mode,
+      body.personAName, body.personBName,
+      body.jointSplitA ?? 50,
+      body.defaultSpendingA ?? 0,
+      body.defaultSpendingB ?? 0,
+      body.defaultTransportA ?? 0,
+      body.defaultTransportB ?? 0,
+      body.id, user.id,
+    ],
   });
   return NextResponse.json({ ok: true });
 }
