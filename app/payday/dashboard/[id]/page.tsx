@@ -269,8 +269,6 @@ export default function DashboardPage() {
             debts={debtsA}
             spending={Number(session.spending_a)}
             travel={Number(session.travel_a)}
-            savingsAllocs={potAllocsA}
-            potMap={potMap}
             personalTotal={personalTotalA}
             savingsTotal={totalSavingsA}
           />
@@ -283,13 +281,33 @@ export default function DashboardPage() {
               debts={debtsB}
               spending={Number(session.spending_b)}
               travel={Number(session.travel_b)}
-              savingsAllocs={potAllocsB}
-              potMap={potMap}
               personalTotal={personalTotalB}
               savingsTotal={totalSavingsB}
             />
           )}
         </div>
+
+        {/* Per-person savings blocks */}
+        {(potAllocsA.length > 0 || potAllocsB.length > 0) && (
+          <div className={isPartner ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : ''}>
+            {potAllocsA.length > 0 && (
+              <SavingsSection
+                name={hh.person_a_name}
+                allocs={potAllocsA}
+                potMap={potMap}
+                total={totalSavingsA}
+              />
+            )}
+            {isPartner && potAllocsB.length > 0 && (
+              <SavingsSection
+                name={hh.person_b_name}
+                allocs={potAllocsB}
+                potMap={potMap}
+                total={totalSavingsB}
+              />
+            )}
+          </div>
+        )}
 
         {/* Bottom recap */}
         <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
@@ -377,7 +395,7 @@ function BillRow({ name, amount, splitA, splitB, tag }: { name: string; amount: 
 interface Pot { id: string; name: string; color: string; owner: string; pot_type: string; }
 interface Allocation { id: string; pot_id: string; amount: number; }
 
-function PersonSection({ name, income, jointContrib, personalBills, debts, spending, travel, savingsAllocs, potMap, personalTotal, savingsTotal }: {
+function PersonSection({ name, income, jointContrib, personalBills, debts, spending, travel, personalTotal, savingsTotal }: {
   name: string;
   income: number;
   jointContrib: number;
@@ -385,8 +403,6 @@ function PersonSection({ name, income, jointContrib, personalBills, debts, spend
   debts: SessionBill[];
   spending: number;
   travel: number;
-  savingsAllocs: Allocation[];
-  potMap: Record<string, Pot>;
   personalTotal: number;
   savingsTotal: number;
 }) {
@@ -448,32 +464,6 @@ function PersonSection({ name, income, jointContrib, personalBills, debts, spend
         </div>
       )}
 
-      {/* Savings transfers */}
-      {savingsAllocs.length > 0 && (
-        <div>
-          <SectionLabel>Savings to transfer</SectionLabel>
-          <div className="space-y-0">
-            {savingsAllocs.map(a => {
-              const pot = potMap[a.pot_id];
-              if (!pot) return null;
-              return (
-                <div key={a.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: pot.color }} />
-                  <span className="text-sm flex-1 text-gray-600">{pot.name}</span>
-                  <span className="text-sm font-semibold text-emerald-700">{fmt2(Number(a.amount))}</span>
-                </div>
-              );
-            })}
-            {savingsTotal > 0 && (
-              <div className="flex justify-between text-xs text-gray-400 pt-1">
-                <span>Savings total</span>
-                <span className="font-medium text-emerald-600">{fmt2(savingsTotal)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Person net */}
       <div className="border-t border-gray-100 pt-3 space-y-1">
         <div className="flex justify-between text-xs text-gray-400">
@@ -486,6 +476,43 @@ function PersonSection({ name, income, jointContrib, personalBills, debts, spend
             {fmt2(income - jointContrib - personalTotal - savingsTotal)}
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SavingsSection({ name, allocs, potMap, total }: {
+  name: string;
+  allocs: Allocation[];
+  potMap: Record<string, Pot>;
+  total: number;
+}) {
+  const fmt2 = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(Math.abs(v));
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
+      <div>
+        <div className="flex items-center gap-2 mb-0.5">
+          <span>💰</span>
+          <h3 className="font-semibold text-gray-900">{name}&apos;s savings</h3>
+        </div>
+        <p className="text-xs text-gray-400">Transfers to make this month</p>
+      </div>
+      <div className="space-y-0">
+        {allocs.map(a => {
+          const pot = potMap[a.pot_id];
+          if (!pot) return null;
+          return (
+            <div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: pot.color }} />
+              <span className="text-sm flex-1 text-gray-700">{pot.name}</span>
+              <span className="text-sm font-semibold text-emerald-700">{fmt2(Number(a.amount))}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-3">
+        <span className="text-gray-600">Total to save</span>
+        <span className="text-emerald-600">{fmt2(total)}</span>
       </div>
     </div>
   );

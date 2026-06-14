@@ -133,6 +133,63 @@ export default function SessionPage() {
     const pa: Record<string, string> = {};
     const pb: Record<string, string> = {};
     pts.forEach(p => { pa[p.id] = ''; pb[p.id] = ''; });
+
+    // Pre-populate income + savings % from the most recent locked session
+    const prevRes = await fetch(`/api/payday/sessions?householdId=${hh.id}`);
+    const allSess: { id: string; date: string; locked_at: string | null; income_a: number; income_b: number; spending_a: number; spending_b: number; travel_a: number; travel_b: number }[] = prevRes.ok ? await prevRes.json() : [];
+    const lastLocked = allSess.filter(s => s.locked_at).sort((a, b) => b.date.localeCompare(a.date))[0];
+
+    if (lastLocked) {
+      setIncomeA(String(lastLocked.income_a || ''));
+      setIncomeB(String(lastLocked.income_b || ''));
+
+      // Back-calculate savings % from last session's allocations
+      const lastRes = await fetch(`/api/payday/sessions?id=${lastLocked.id}`);
+      if (lastRes.ok) {
+        const lastData = await lastRes.json();
+        const lastBills: { name: string; amount: number; category: string }[] = lastData.bills ?? [];
+        const lastAllocs: { pot_id: string; amount: number }[] = lastData.allocations ?? [];
+
+        const splitAn = hh.joint_split_a;
+        const splitBn = 100 - splitAn;
+        const lastJointFixed = lastBills.filter(b => b.category === 'joint_fixed').reduce((s, b) => s + Number(b.amount), 0);
+        const lastExtrasA = lastBills.reduce((s, b) => {
+          if (b.category === 'joint_extra') return s + Number(b.amount) * (splitAn / 100);
+          if (b.category === 'joint_extra_a') return s + Number(b.amount);
+          return s;
+        }, 0);
+        const lastExtrasB = lastBills.reduce((s, b) => {
+          if (b.category === 'joint_extra') return s + Number(b.amount) * (splitBn / 100);
+          if (b.category === 'joint_extra_b') return s + Number(b.amount);
+          return s;
+        }, 0);
+        const lastPersonalA = lastBills.filter(b => ['individual_a','debt_a'].includes(b.category)).reduce((s, b) => s + Number(b.amount), 0)
+          + Number(lastLocked.spending_a) + Number(lastLocked.travel_a);
+        const lastPersonalB = lastBills.filter(b => ['individual_b','debt_b'].includes(b.category)).reduce((s, b) => s + Number(b.amount), 0)
+          + Number(lastLocked.spending_b) + Number(lastLocked.travel_b);
+
+        const lastAvailA = Number(lastLocked.income_a) - (lastJointFixed * splitAn / 100) - lastExtrasA - lastPersonalA;
+        const lastAvailB = Number(lastLocked.income_b) - (lastJointFixed * splitBn / 100) - lastExtrasB - lastPersonalB;
+
+        if (lastAvailA > 0) {
+          lastAllocs.forEach(a => {
+            const pot = pts.find(p => p.id === a.pot_id);
+            if (pot && (pot.owner === 'person_a')) {
+              pa[a.pot_id] = String(Math.round((Number(a.amount) / lastAvailA) * 100));
+            }
+          });
+        }
+        if (lastAvailB > 0) {
+          lastAllocs.forEach(a => {
+            const pot = pts.find(p => p.id === a.pot_id);
+            if (pot && (pot.owner === 'person_b')) {
+              pb[a.pot_id] = String(Math.round((Number(a.amount) / lastAvailB) * 100));
+            }
+          });
+        }
+      }
+    }
+
     setPercentsA(pa);
     setPercentsB(pb);
 
