@@ -33,7 +33,7 @@ export default function IncomePage() {
     if (!form.amount || isNaN(+form.amount) || +form.amount <= 0) e.amount = 'Enter a valid amount';
     if (form.frequency === 'monthly') {
       if (!form.paydayDayOfMonth || +form.paydayDayOfMonth < 1 || +form.paydayDayOfMonth > 31) e.paydayDayOfMonth = '1–31';
-    } else if (form.frequency !== 'monthly' && !form.nextDate) {
+    } else if (!form.nextDate) {
       e.nextDate = 'Required';
     }
     setErrors(e);
