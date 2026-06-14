@@ -34,7 +34,6 @@ export default function SessionPage() {
   const [pots, setPots] = useState<Pot[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [locked, setLocked] = useState(false);
   const [userEmail, setUserEmail] = useState('');
 
   // Step 1 — income (no starting balance)
@@ -215,7 +214,7 @@ export default function SessionPage() {
     }
     const allAllocs = Object.entries(allocMap).map(([potId, amount]) => ({ potId, amount }));
 
-    await fetch('/api/payday/sessions', {
+    const res = await fetch('/api/payday/sessions', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         householdId: hh!.id, date: new Date().toISOString().slice(0, 10),
@@ -225,8 +224,8 @@ export default function SessionPage() {
         bills: allBills, allocations: allAllocs, lock: true,
       }),
     });
-    setLocked(true);
-    setSaving(false);
+    const data = await res.json();
+    router.push(`/payday/dashboard/${data.id}`);
   }
 
   if (loading) return (

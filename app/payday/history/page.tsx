@@ -183,16 +183,26 @@ export default function HistoryPage() {
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Session log</h3>
               <div className="space-y-2">
                 {sessions.map(s => {
-                  const totalIn = Number(s.income_a) + Number(s.income_b) + Number(s.starting_balance);
+                  const totalIn = Number(s.income_a) + Number(s.income_b);
                   const saved = (sessionDetails[s.id] ?? []).reduce((sum, a) => sum + a.amount, 0);
+                  const period = (() => {
+                    const d = new Date(s.date);
+                    const covers = new Date(d);
+                    if (d.getDate() >= 20) covers.setMonth(covers.getMonth() + 1);
+                    return covers.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+                  })();
                   return (
-                    <div key={s.id} className="bg-white border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <Link key={s.id} href={`/payday/dashboard/${s.id}`}
+                      className="bg-white border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between hover:border-gray-300 transition-colors block">
                       <div>
-                        <div className="text-sm font-medium">{new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Saved {fmt(saved)}</div>
+                        <div className="text-sm font-medium">{period} budget</div>
+                        <div className="text-xs text-gray-400 mt-0.5">Paid {new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} · Saved {fmt(saved)}</div>
                       </div>
-                      <div className="text-sm font-semibold text-gray-700">{fmt(totalIn)}</div>
-                    </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-semibold text-gray-700">{fmt(totalIn)}</div>
+                        <span className="text-gray-300">→</span>
+                      </div>
+                    </Link>
                   );
                 })}
               </div>
