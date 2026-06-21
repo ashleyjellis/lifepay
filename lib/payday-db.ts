@@ -130,6 +130,7 @@ export async function initSchema() {
     'ALTER TABLE households ADD COLUMN payday_day INTEGER NOT NULL DEFAULT 25',
     'ALTER TABLE savings_pots ADD COLUMN account_type TEXT',
     'ALTER TABLE savings_pots ADD COLUMN provider TEXT',
+    'ALTER TABLE savings_pots ADD COLUMN current_balance REAL',
   ];
 
   for (const sql of migrations) {
