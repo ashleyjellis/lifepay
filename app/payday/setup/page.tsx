@@ -625,6 +625,15 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
     setLsSaving(false); setLsSaved(true); setTimeout(() => setLsSaved(false), 2000);
   }
 
+  function effectiveMonths(p: EditPot): number | null {
+    if (p.targetMode === 'date' && p.targetDate) {
+      const now = new Date();
+      const [y, m] = p.targetDate.split('-').map(Number);
+      return Math.max(1, (y - now.getFullYear()) * 12 + (m - now.getMonth()));
+    }
+    return p.targetMonths ? parseInt(p.targetMonths) : null;
+  }
+
   async function savePotSection(
     pots: EditPot[], potType: 'short_term' | 'long_term',
     setSaving: (v: boolean) => void, setSaved: (v: boolean) => void,
@@ -636,10 +645,10 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
     const toCreate = pots.filter(p => !p.dbId && !p.deleted && p.name);
     await Promise.all([
       ...toDelete.map(p => fetch(`/api/payday/pots?id=${p.dbId}`, { method: 'DELETE' })),
-      ...toUpdate.map(p => fetch('/api/payday/pots', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: p.dbId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: p.targetMonths ? parseInt(p.targetMonths) : null, color: p.color, accountType: p.accountType ?? null, provider: p.provider ?? null }) })),
+      ...toUpdate.map(p => fetch('/api/payday/pots', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: p.dbId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), color: p.color, accountType: p.accountType ?? null, provider: p.provider ?? null }) })),
     ]);
     const created = await Promise.all(toCreate.map((p, i) =>
-      fetch('/api/payday/pots', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ householdId: hh.id, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: p.targetMonths ? parseInt(p.targetMonths) : null, color: p.color, owner: p.owner, potType, sortOrder: pots.length + i, accountType: p.accountType ?? null, provider: p.provider ?? null }) }).then(r=>r.json())
+      fetch('/api/payday/pots', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ householdId: hh.id, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), color: p.color, owner: p.owner, potType, sortOrder: pots.length + i, accountType: p.accountType ?? null, provider: p.provider ?? null }) }).then(r=>r.json())
     ));
     let ci = 0;
     setList(prev => {
