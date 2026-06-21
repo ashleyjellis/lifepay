@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -222,6 +222,7 @@ export default function PaydayHome() {
           {/* Draft / new / future editable session — inline editable */}
           {isEditable && !detailLoading && (
             <InlineEdit
+              key={selectedMonth}
               hh={hh} pots={pots}
               existingId={selectedSession?.id ?? null}
               detail={isDraft ? detail : null}
@@ -323,10 +324,68 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
   );
 }
 
-// ── Inline editable session ─────────────────────────────────────────────────
+// ── Shared sub-components for InlineEdit (must be defined OUTSIDE InlineEdit
+//    to prevent React from treating them as new component types on every render,
+//    which would cause unmount/remount and lose input focus mid-keystroke) ────
 
 interface EditBill { _key: string; name: string; amount: string; }
 interface EditExtra { _key: string; name: string; amount: string; who: 'both' | 'a' | 'b'; }
+
+function EInput({ label, value, onChange, dark }: { label: string; value: string; onChange: (v: string) => void; dark?: boolean }) {
+  return (
+    <div className="flex-1">
+      <div className={`text-xs mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>{label}</div>
+      <div className="relative">
+        <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400`}>£</span>
+        <input type="number" min="0" value={value} onChange={e=>onChange(e.target.value)} placeholder="0"
+          className={`w-full pl-7 pr-2 py-2 text-sm rounded-xl focus:outline-none focus:ring-2 ${dark?'bg-white/10 border border-white/20 text-white focus:ring-white/30':'border border-gray-200 bg-white focus:ring-gray-900'}`} />
+      </div>
+    </div>
+  );
+}
+
+function EditBillRow({ bill, onChange, onRemove }: { bill: EditBill; onChange: (f: 'name'|'amount', v: string) => void; onRemove: () => void }) {
+  return (
+    <div className="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0">
+      <input value={bill.name} onChange={e=>onChange('name',e.target.value)} placeholder="Name"
+        className="flex-1 text-sm text-gray-700 bg-transparent border-0 focus:outline-none focus:bg-gray-50 rounded px-1 -mx-1" />
+      <div className="relative w-28 shrink-0">
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span>
+        <input type="number" min="0" value={bill.amount} onChange={e=>onChange('amount',e.target.value)} placeholder="0"
+          className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
+      </div>
+      <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none w-5">×</button>
+    </div>
+  );
+}
+
+function AddBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button onClick={onClick} className="w-full border border-dashed border-gray-200 py-2 rounded-xl text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors mt-1">{label}</button>;
+}
+
+function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (owner: 'person_a'|'person_b', potType: 'short_term'|'long_term', name: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [type, setType] = useState<'short_term'|'long_term'>('short_term');
+  const [adding, setAdding] = useState(false);
+  if (!open) return <button onClick={()=>setOpen(true)} className="w-full border border-dashed border-gray-200 py-2 rounded-xl text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors mt-1">+ Add savings / investment pot</button>;
+  return (
+    <div className="mt-1 border border-gray-200 rounded-xl p-3 space-y-2">
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="Pot name (e.g. ISA, Holiday)" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900" />
+      <div className="flex gap-2">
+        {(['short_term','long_term'] as const).map(t=>(
+          <button key={t} onClick={()=>setType(t)} className={`flex-1 text-xs py-1.5 rounded-lg border transition-colors ${type===t?'bg-[#1a1a1a] text-white border-[#1a1a1a]':'border-gray-200 text-gray-500'}`}>{t==='short_term'?'Short-term':'Long-term'}</button>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={async()=>{if(!name.trim())return;setAdding(true);await onAdd(owner,type,name.trim());setName('');setOpen(false);setAdding(false);}} disabled={!name.trim()||adding} className="flex-1 text-xs bg-[#1a1a1a] text-white py-1.5 rounded-lg disabled:opacity-40">{adding?'Adding…':'Add pot'}</button>
+        <button onClick={()=>setOpen(false)} className="text-xs text-gray-400 px-3 py-1.5 rounded-lg border border-gray-200">Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Inline editable session ─────────────────────────────────────────────────
 
 function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail, month, onSaved, onLocked, onPotsChanged }: {
   hh: Household; pots: Pot[];
@@ -441,7 +500,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const jointContribA = jointTotal*(splitA/100)+extrasForA;
   const jointContribB = jointTotal*(splitB/100)+extrasForB;
 
-  const potsA = pots.filter(p=>p.owner==='person_a');
+  // Include 'joint' in person A's pots so pots created before owner tracking still appear
+  const potsA = pots.filter(p=>p.owner==='person_a'||p.owner==='joint');
   const potsB = pots.filter(p=>p.owner==='person_b');
   const potAmountA = (id: string) => availableA*((parseFloat(percentsA[id])||0)/100);
   const potAmountB = (id: string) => availableB*((parseFloat(percentsB[id])||0)/100);
@@ -483,6 +543,19 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
     else if (savedId) { setSaved(true); setTimeout(()=>setSaved(false),2000); onSaved(savedId); }
   }
 
+  // Keep a ref to persist so unmount cleanup always has the latest closure
+  const persistRef = useRef(persist);
+  useEffect(() => { persistRef.current = persist; });
+  // Auto-save as draft when switching away (component unmounts)
+  useEffect(() => {
+    return () => {
+      const p = persistRef.current;
+      // Only save if there's something worth saving
+      if (sessionId) { p(false); }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function addPot(owner: 'person_a' | 'person_b', potType: 'short_term' | 'long_term', name: string) {
     const colors = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6'];
     const color = colors[pots.length % colors.length];
@@ -495,60 +568,6 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       setPercentsA(p=>({...p,[newPot.id]:''}));
       setPercentsB(p=>({...p,[newPot.id]:''}));
     }
-  }
-
-  function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (owner: 'person_a'|'person_b', potType: 'short_term'|'long_term', name: string) => Promise<void> }) {
-    const [open, setOpen] = useState(false);
-    const [name, setName] = useState('');
-    const [type, setType] = useState<'short_term'|'long_term'>('short_term');
-    const [adding, setAdding] = useState(false);
-    if (!open) return <button onClick={()=>setOpen(true)} className="w-full border border-dashed border-gray-200 py-2 rounded-xl text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors mt-1">+ Add savings / investment pot</button>;
-    return (
-      <div className="mt-1 border border-gray-200 rounded-xl p-3 space-y-2">
-        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Pot name (e.g. ISA, Holiday)" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900" />
-        <div className="flex gap-2">
-          {(['short_term','long_term'] as const).map(t=>(
-            <button key={t} onClick={()=>setType(t)} className={`flex-1 text-xs py-1.5 rounded-lg border transition-colors ${type===t?'bg-[#1a1a1a] text-white border-[#1a1a1a]':'border-gray-200 text-gray-500'}`}>{t==='short_term'?'Short-term':'Long-term'}</button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <button onClick={async()=>{if(!name.trim())return;setAdding(true);await onAdd(owner,type,name.trim());setName('');setOpen(false);setAdding(false);}} disabled={!name.trim()||adding} className="flex-1 text-xs bg-[#1a1a1a] text-white py-1.5 rounded-lg disabled:opacity-40">{adding?'Adding…':'Add pot'}</button>
-          <button onClick={()=>setOpen(false)} className="text-xs text-gray-400 px-3 py-1.5 rounded-lg border border-gray-200">Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
-  function EInput({ label, value, onChange, dark }: { label: string; value: string; onChange: (v: string) => void; dark?: boolean }) {
-    return (
-      <div className="flex-1">
-        <div className={`text-xs mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>{label}</div>
-        <div className="relative">
-          <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${dark?'text-gray-400':'text-gray-400'}`}>£</span>
-          <input type="number" min="0" value={value} onChange={e=>onChange(e.target.value)} placeholder="0"
-            className={`w-full pl-7 pr-2 py-2 text-sm rounded-xl focus:outline-none focus:ring-2 ${dark?'bg-white/10 border border-white/20 text-white focus:ring-white/30':'border border-gray-200 bg-white focus:ring-gray-900'}`} />
-        </div>
-      </div>
-    );
-  }
-
-  function EditBillRow({ bill, onChange, onRemove }: { bill: EditBill; onChange: (f: 'name'|'amount', v: string) => void; onRemove: () => void }) {
-    return (
-      <div className="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0">
-        <input value={bill.name} onChange={e=>onChange('name',e.target.value)} placeholder="Name"
-          className="flex-1 text-sm text-gray-700 bg-transparent border-0 focus:outline-none focus:bg-gray-50 rounded px-1 -mx-1" />
-        <div className="relative w-28 shrink-0">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span>
-          <input type="number" min="0" value={bill.amount} onChange={e=>onChange('amount',e.target.value)} placeholder="0"
-            className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
-        </div>
-        <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none w-5">×</button>
-      </div>
-    );
-  }
-
-  function AddBtn({ label, onClick }: { label: string; onClick: () => void }) {
-    return <button onClick={onClick} className="w-full border border-dashed border-gray-200 py-2 rounded-xl text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors mt-1">{label}</button>;
   }
 
   const whoLabel = (who: 'both'|'a'|'b') => who==='both'?'Both':who==='a'?hh.person_a_name:hh.person_b_name;
@@ -665,8 +684,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
         {(potsA.length>0||true) && (
           <DSection title={`${hh.person_a_name}'s savings`} icon="💰" subtitle={`Available: ${fmt(availableA)}`}>
             <div className="space-y-2">
-              {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_a').length>0 && <SLabel>Short-term goals</SLabel>}
-              {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_a').map(p => {
+              {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).length>0 && <SLabel>Short-term goals</SLabel>}
+              {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => {
                 const pct = parseFloat(percentsA[p.id])||0; const amount = availableA*(pct/100);
                 return (
                   <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
@@ -681,8 +700,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                   </div>
                 );
               })}
-              {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_a').length>0 && <SLabel>Long-term savings</SLabel>}
-              {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_a').map(p => {
+              {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).length>0 && <SLabel>Long-term savings</SLabel>}
+              {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => {
                 const pct = parseFloat(percentsA[p.id])||0; const amount = availableA*(pct/100);
                 return (
                   <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
