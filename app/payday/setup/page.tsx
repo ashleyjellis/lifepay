@@ -645,7 +645,7 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
     const toCreate = pots.filter(p => !p.dbId && !p.deleted && p.name);
     await Promise.all([
       ...toDelete.map(p => fetch(`/api/payday/pots?id=${p.dbId}`, { method: 'DELETE' })),
-      ...toUpdate.map(p => fetch('/api/payday/pots', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: p.dbId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), color: p.color, accountType: p.accountType ?? null, provider: p.provider ?? null }) })),
+      ...toUpdate.map(p => fetch('/api/payday/pots', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: p.dbId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), color: p.color, owner: p.owner, potType: p.potType, sortOrder: 0, accountType: p.accountType ?? null, provider: p.provider ?? null }) })),
     ]);
     const created = await Promise.all(toCreate.map((p, i) =>
       fetch('/api/payday/pots', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ householdId: hh.id, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), color: p.color, owner: p.owner, potType, sortOrder: pots.length + i, accountType: p.accountType ?? null, provider: p.provider ?? null }) }).then(r=>r.json())
@@ -867,7 +867,7 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
                     const asPotDraft: PotDraft = { id: p.localId, name: p.name, targetAmount: p.targetAmount, targetMonths: p.targetMonths, color: p.color, owner: p.owner, potType: 'short_term', targetMode: p.targetMode, targetDate: p.targetDate };
                     return (
                       <ShortTermPotRow key={p.localId} pot={asPotDraft} paydayDay={hh.payday_day}
-                        onUpdate={patch => setShortPots(l => l.map(x => x.localId === p.localId ? { ...x, name: patch.name ?? x.name, targetAmount: patch.targetAmount ?? x.targetAmount, targetMonths: patch.targetMonths ?? x.targetMonths, targetMode: patch.targetMode ?? x.targetMode, targetDate: patch.targetDate !== undefined ? patch.targetDate : x.targetDate } : x))}
+                        onUpdate={patch => setShortPots(l => l.map(x => x.localId === p.localId ? { ...x, ...patch } : x))}
                         onRemove={() => setShortPots(l => l.map(x => x.localId === p.localId ? { ...x, deleted: true } : x))} />
                     );
                   })}
