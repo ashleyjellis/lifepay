@@ -129,9 +129,17 @@ export default function PaydayHome() {
   const isLocked = !!selectedSession?.locked_at;
   const isDraft = !!selectedSession && !selectedSession.locked_at;
   const isEditable = editableMonths.includes(selectedMonth) && !isLocked;
-  // Pre-populate future months from latest locked session
-  const latestLockedDetail = detail; // loaded for all sessions including for pre-pop
+  // Pre-populate future months from latest locked session (separate from current detail)
   const latestLockedSession = sessions.filter(s => s.locked_at).sort((a,b) => b.date.localeCompare(a.date))[0];
+  const [latestLockedDetail, setLatestLockedDetail] = useState<SessionDetail | null>(null);
+  useEffect(() => {
+    if (latestLockedSession) {
+      fetch(`/api/payday/sessions?id=${latestLockedSession.id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setLatestLockedDetail(d));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestLockedSession?.id]);
 
   return (
     <div className="min-h-screen bg-[#faf9f7]">
@@ -228,9 +236,10 @@ export default function PaydayHome() {
               detail={isDraft ? detail : null}
               latestLockedDetail={(!selectedSession && selectedMonth !== curYM) ? latestLockedDetail : null}
               month={selectedMonth}
-              onSaved={(newId) => {
+              onSaved={() => {
                 refreshSessions(hh);
-                loadDetail(newId);
+                // Do NOT call loadDetail here — InlineEdit owns its own state,
+                // reloading detail would reset the form and trigger another auto-save loop
               }}
               onLocked={(newId) => {
                 refreshSessions(hh);
@@ -393,7 +402,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   detail: SessionDetail | null;
   latestLockedDetail: SessionDetail | null;
   month: string;
-  onSaved: (id: string) => void;
+  onSaved: () => void;
   onLocked: (id: string) => void;
   onPotsChanged: (pots: Pot[]) => void;
 }) {
@@ -540,7 +549,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
     }
     setSaving(false);
     if (lock && savedId) onLocked(savedId);
-    else if (savedId) { setSaved(true); setTimeout(()=>setSaved(false),2000); onSaved(savedId); }
+    else if (savedId) { setSaved(true); setTimeout(()=>setSaved(false),2000); onSaved(); }
   }
 
   // Always keep persistRef pointing at the latest persist closure
