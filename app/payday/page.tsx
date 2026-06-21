@@ -142,12 +142,19 @@ export default function PaydayHome() {
   const isPartner = hh.mode === 'partner';
   const curYM = toYM(new Date());
   const paydayDay = hh.payday_day ?? 25;
-  const daysUntilNextPayday = (() => {
-    const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, paydayDay);
-    return Math.ceil((next.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  })();
-  const nextMonthYM = toYM(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
+  const now = new Date();
+  // Has this month's payday happened yet?
+  const paydayThisMonth = new Date(now.getFullYear(), now.getMonth(), paydayDay);
+  const paydayNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, paydayDay);
+  const nextPaydayDate = now < paydayThisMonth ? paydayThisMonth : paydayNextMonth;
+  const daysUntilNextPayday = Math.ceil((nextPaydayDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  // Has today passed the payday day in the selected month?
+  const [selY, selM] = selectedMonth.split('-').map(Number);
+  const selectedMonthPayday = new Date(selY, selM - 1, paydayDay);
+  const paydayHasPassed = now >= selectedMonthPayday;
+  // The spend month is the month AFTER the payday month (e.g. paid Jun 25 → spending July)
+  const spendMonthLabel = new Date(selY, selM, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const nextMonthYM = toYM(new Date(now.getFullYear(), now.getMonth() + 1, 1));
   const editableMonths = getEditableMonths();
   const months = generateMonths(sessions.map(s => s.date));
   const selectedSession = sessions.find(s => s.date.startsWith(selectedMonth));
@@ -233,7 +240,7 @@ export default function PaydayHome() {
           {/* Countdown pill */}
           <div className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-white border border-[#c1c9be] text-[#414940] whitespace-nowrap">
             <span>📅</span>
-            <span>{daysUntilNextPayday} days until next payday</span>
+            <span>{daysUntilNextPayday === 0 ? 'Payday today! 🎉' : `${daysUntilNextPayday} days until payday`}</span>
           </div>
         </div>
 
@@ -242,18 +249,32 @@ export default function PaydayHome() {
           <div className="flex items-start justify-between flex-wrap gap-2">
             <div>
               <div className="text-[#396940] font-semibold text-sm mb-1">Happy Payday, {names}! 🌿</div>
-              <div className="text-2xl font-bold text-[#181c1c]">{monthLabel(selectedMonth)}</div>
+              <div className="text-2xl font-bold text-[#181c1c]">{monthLabel(selectedMonth)} payday</div>
+              <div className="text-sm text-[#717970] mt-0.5">📆 Sort out your <span className="font-semibold text-[#414940]">{spendMonthLabel}</span> spend</div>
             </div>
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold mt-1 ${
               isLocked ? 'bg-[#baf0bc] text-[#002109]' :
+              paydayHasPassed && isDraft ? 'bg-[#ffdcc4] text-[#2f1400]' :
+              paydayHasPassed && !selectedSession ? 'bg-[#ffdcc4] text-[#2f1400]' :
               isDraft ? 'bg-[#ffdcc4] text-[#2f1400]' :
               isEditable ? 'bg-[#ffdf96] text-[#251a00]' :
               'bg-[#ebeeed] text-[#414940]'
             }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isLocked?'bg-[#396940]':isDraft?'bg-[#8e4e14]':isEditable?'bg-[#765a05]':'bg-[#717970]'}`} />
-              {isLocked ? 'Locked in' : isDraft ? 'In progress' : isEditable ? 'Plan ahead' : 'No data'}
+              <span className={`w-1.5 h-1.5 rounded-full ${isLocked?'bg-[#396940]':paydayHasPassed&&!isLocked?'bg-[#8e4e14]':isEditable?'bg-[#765a05]':'bg-[#717970]'}`} />
+              {isLocked ? 'Locked in' : paydayHasPassed && isDraft ? 'Awaiting lock-in' : paydayHasPassed && !selectedSession ? 'Payday passed' : isDraft ? 'In progress' : isEditable ? 'Plan ahead' : 'No data'}
             </div>
           </div>
+
+          {/* ── Past-payday nudge ── */}
+          {paydayHasPassed && !isLocked && isEditable && (
+            <div className="flex items-start gap-3 bg-[#fff3e0] border border-[#ffcc80] rounded-2xl px-4 py-3.5 text-sm">
+              <span className="text-lg shrink-0">💸</span>
+              <div>
+                <div className="font-semibold text-[#5d3a00]">Your {monthLabel(selectedMonth)} payday has passed</div>
+                <div className="text-[#7c4a00] mt-0.5">Check your actuals and lock in this month once you&apos;re happy — it can&apos;t be edited after that.</div>
+              </div>
+            </div>
+          )}
 
           {detailLoading && <div className="text-center py-12 text-[#717970] text-sm font-medium">Loading...</div>}
 
