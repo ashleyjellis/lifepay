@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -59,6 +59,8 @@ export default function PaydayHome() {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [householdBills, setHouseholdBills] = useState<{id:string;name:string;amount:number;category:string}[]>([]);
+  const [householdDebts, setHouseholdDebts] = useState<{id:string;name:string;amount:number;person:string}[]>([]);
   // Onboarding overlay: step 0 = none, 1 = congrats modal, 2 = pill highlight tooltip
   const [onboardingStep, setOnboardingStep] = useState<0|1|2>(0);
 
@@ -71,11 +73,18 @@ export default function PaydayHome() {
         const hh = hRes.ok ? await hRes.json() : null;
         if (!hh) { router.replace('/payday/setup'); return; }
         setHousehold(hh);
-        const [sRes, pRes] = await Promise.all([fetch(`/api/payday/sessions?householdId=${hh.id}`), fetch(`/api/payday/pots?householdId=${hh.id}`)]);
+        const [sRes, pRes, bRes, dRes] = await Promise.all([
+          fetch(`/api/payday/sessions?householdId=${hh.id}`),
+          fetch(`/api/payday/pots?householdId=${hh.id}`),
+          fetch(`/api/payday/bills?householdId=${hh.id}`),
+          fetch(`/api/payday/debts?householdId=${hh.id}`),
+        ]);
         const all: SessionSummary[] = sRes.ok ? await sRes.json() : [];
         const pts: Pot[] = pRes.ok ? await pRes.json() : [];
         setSessions(all.sort((a, b) => b.date.localeCompare(a.date)));
         setPots(pts);
+        if (bRes.ok) setHouseholdBills(await bRes.json());
+        if (dRes.ok) setHouseholdDebts(await dRes.json());
         const latestLocked = all.filter(s => s.locked_at).sort((a, b) => b.date.localeCompare(a.date))[0];
         if (latestLocked) setSelectedMonth(latestLocked.date.slice(0, 7));
       } catch { /* ignore */ }
@@ -236,12 +245,10 @@ export default function PaydayHome() {
               existingId={selectedSession?.id ?? null}
               detail={isDraft ? detail : null}
               latestLockedDetail={(!selectedSession && selectedMonth !== curYM) ? latestLockedDetail : null}
+              householdBills={householdBills}
+              householdDebts={householdDebts}
               month={selectedMonth}
-              onSaved={() => {
-                refreshSessions(hh);
-                // Do NOT call loadDetail here — InlineEdit owns its own state,
-                // reloading detail would reset the form and trigger another auto-save loop
-              }}
+              onSaved={() => { refreshSessions(hh); }}
               onLocked={(newId) => {
                 refreshSessions(hh);
                 setSelectedMonth(selectedMonth);
@@ -397,11 +404,13 @@ function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (o
 
 // ── Inline editable session ─────────────────────────────────────────────────
 
-function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail, month, onSaved, onLocked, onPotsChanged }: {
+function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail, householdBills, householdDebts, month, onSaved, onLocked, onPotsChanged }: {
   hh: Household; pots: Pot[];
   existingId: string | null;
   detail: SessionDetail | null;
   latestLockedDetail: SessionDetail | null;
+  householdBills: {id:string;name:string;amount:number;category:string}[];
+  householdDebts: {id:string;name:string;amount:number;person:string}[];
   month: string;
   onSaved: () => void;
   onLocked: (id: string) => void;
@@ -487,11 +496,20 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
         if (dAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dAvA*100));});
         if (dAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dAvB*100));});
       } else {
-        // Truly fresh — pre-fill from household defaults
+        // Truly fresh — pre-fill from household setup data
         setSpendingA(hh.default_spending_a > 0 ? String(hh.default_spending_a) : '');
         setSpendingB(hh.default_spending_b > 0 ? String(hh.default_spending_b) : '');
         setTravelA(hh.default_transport_a > 0 ? String(hh.default_transport_a) : '');
         setTravelB(hh.default_transport_b > 0 ? String(hh.default_transport_b) : '');
+        if (householdBills.length > 0) {
+          setJointBills(householdBills.filter(b=>b.category==='joint_fixed').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+          setBillsA(householdBills.filter(b=>b.category==='individual_a').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+          setBillsB(householdBills.filter(b=>b.category==='individual_b').map(b=>({ _key: uid(), name: b.name, amount: String(b.amount) })));
+        }
+        if (householdDebts.length > 0) {
+          setDebtsA(householdDebts.filter(d=>d.person==='a').map(d=>({ _key: uid(), name: d.name, amount: String(d.amount) })));
+          setDebtsB(householdDebts.filter(d=>d.person==='b').map(d=>({ _key: uid(), name: d.name, amount: String(d.amount) })));
+        }
       }
     }
     setPercentsA(pa); setPercentsB(pb);
@@ -552,30 +570,6 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
     if (lock && savedId) onLocked(savedId);
     else if (savedId) { setSaved(true); setTimeout(()=>setSaved(false),2000); onSaved(); }
   }
-
-  // Always keep persistRef pointing at the latest persist closure
-  const persistRef = useRef(persist);
-  useEffect(() => { persistRef.current = persist; });
-
-  // Track whether there's anything worth saving (updated every render via ref)
-  const hasDataRef = useRef(false);
-  useEffect(() => { hasDataRef.current = !!(iA || iB || jointBills.length || billsA.length || billsB.length); });
-
-  // Debounced auto-save — fires 1.5s after the user stops changing anything
-  const debounceRef = useRef<ReturnType<typeof setTimeout>|null>(null);
-  useEffect(() => {
-    if (!hasDataRef.current) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => { persistRef.current(false); }, 1500);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomeA, incomeB, jointBills, extras, billsA, billsB, debtsA, debtsB, spendingA, spendingB, travelA, travelB, percentsA, percentsB]);
-
-  // Immediate save on unmount (e.g. switching months) — persistRef has latest closure
-  useEffect(() => {
-    return () => { if (hasDataRef.current) persistRef.current(false); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function addPot(owner: 'person_a' | 'person_b', potType: 'short_term' | 'long_term', name: string) {
     const colors = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6'];
@@ -802,22 +796,29 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
         </div>
       )}
 
-      {/* Actions */}
-      {!canLock && (aReady===false||bReady===false) && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-700">
-          {!aReady && <div>{hh.person_a_name}: {(100-allocPctA).toFixed(0)}% still to allocate in savings</div>}
-          {isPartner&&!bReady && <div>{hh.person_b_name}: {(100-allocPctB).toFixed(0)}% still to allocate in savings</div>}
+      {/* Bottom padding so content clears sticky footer */}
+      <div className="h-24" />
+
+      {/* Sticky footer */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-gray-100 px-4 py-3 safe-bottom">
+        <div className="max-w-2xl mx-auto space-y-2">
+          {!canLock && (aReady===false||bReady===false) && (
+            <div className="text-xs text-amber-600 text-center">
+              {!aReady && <span>{hh.person_a_name}: {(100-allocPctA).toFixed(0)}% still to allocate · </span>}
+              {isPartner&&!bReady && <span>{hh.person_b_name}: {(100-allocPctB).toFixed(0)}% still to allocate</span>}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button onClick={()=>persist(false)} disabled={saving}
+              className="flex-1 border border-gray-200 py-3 rounded-xl text-sm font-medium hover:border-gray-400 disabled:opacity-40 transition-colors bg-white">
+              {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
+            </button>
+            <button onClick={()=>persist(true)} disabled={!canLock||saving}
+              className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors">
+              {saving ? 'Saving…' : 'Lock in 🔒'}
+            </button>
+          </div>
         </div>
-      )}
-      <div className="flex gap-3 pb-6">
-        <button onClick={()=>persist(false)} disabled={saving}
-          className="flex-1 border border-gray-200 py-3.5 rounded-xl text-sm font-medium hover:border-gray-400 disabled:opacity-40 transition-colors">
-          {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
-        </button>
-        <button onClick={()=>persist(true)} disabled={!canLock||saving}
-          className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors">
-          {saving ? 'Saving…' : 'Lock in 🔒'}
-        </button>
       </div>
     </div>
   );
