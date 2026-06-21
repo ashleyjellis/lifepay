@@ -29,6 +29,7 @@ interface EditPot {
   name: string; targetAmount: string; targetMonths: string;
   color: string; owner: 'person_a' | 'person_b' | 'joint'; potType: 'short_term' | 'long_term';
   accountType?: AccountType; provider?: string;
+  targetMode?: 'months' | 'date'; targetDate?: string;
 }
 
 interface HouseholdRow {
@@ -215,8 +216,14 @@ function LifestylePersonBlock({ name, spending, onSpending, transport, onTranspo
   );
 }
 
-function ShortTermPotRow({ pot, onUpdate, onRemove }: {
-  pot: PotDraft; onUpdate: (patch: Partial<PotDraft>) => void; onRemove: () => void;
+function ordinal(n: number): string {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function ShortTermPotRow({ pot, onUpdate, onRemove, paydayDay }: {
+  pot: PotDraft; onUpdate: (patch: Partial<PotDraft>) => void; onRemove: () => void; paydayDay?: number;
 }) {
   const mode = pot.targetMode ?? 'months';
   function monthsUntilDate(ym: string): number {
@@ -236,6 +243,14 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
   }
   const months = mode === 'date' && pot.targetDate ? monthsUntilDate(pot.targetDate) : parseInt(pot.targetMonths) || 0;
   const monthly = pot.targetAmount && months > 0 ? (parseFloat(pot.targetAmount) / months).toFixed(0) : null;
+
+  // Callout for deadline mode
+  const deadlineLabel = (() => {
+    if (mode !== 'date' || !pot.targetDate || !paydayDay) return null;
+    const [y, m] = pot.targetDate.split('-').map(Number);
+    const monthName = new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    return `Goal to be met when paid on ${ordinal(paydayDay)} ${monthName}`;
+  })();
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
       <div className="flex items-center gap-2">
@@ -268,6 +283,16 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
           </select>
         )}
       </div>
+      {deadlineLabel && (
+        <div className="flex items-start gap-2 bg-[#eef3ef] rounded-xl px-3 py-2.5 text-xs text-[#4a6b4a]">
+          <span className="shrink-0 mt-0.5 text-[#7bae7f]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
+          <span className="font-medium">{deadlineLabel}</span>
+        </div>
+      )}
       {monthly && <div className="text-xs text-emerald-600 font-medium">→ Save £{monthly}/month{mode === 'date' && pot.targetDate ? ` over ${months} months` : ''}</div>}
     </div>
   );
@@ -828,25 +853,15 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
               return (
                 <div key={owner} className="space-y-2">
                   <div className="text-xs font-bold text-[#717970] uppercase tracking-wide">{label}</div>
-                  {pots.map(p => (
-                    <div key={p.localId} className="flex items-center gap-3 bg-[#f7faf8] border border-[#e6e9e7] rounded-xl px-3 py-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                      <input value={p.name} onChange={e => setShortPots(l => l.map(x => x.localId===p.localId?{...x,name:e.target.value}:x))}
-                        className="flex-1 text-sm bg-transparent border-0 focus:outline-none font-medium text-[#181c1c]" placeholder="Pot name" />
-                      <div className="relative w-28 shrink-0">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#717970] text-xs">£</span>
-                        <input type="number" min="0" value={p.targetAmount}
-                          onChange={e => setShortPots(l => l.map(x => x.localId===p.localId?{...x,targetAmount:e.target.value}:x))}
-                          placeholder="Target" className="w-full pl-6 pr-2 py-1.5 text-sm border border-[#c1c9be] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
-                      </div>
-                      <button onClick={() => setShortPots(l => l.map(x => x.localId===p.localId?{...x,deleted:true}:x))} className="text-[#c1c9be] hover:text-[#ba1a1a] shrink-0">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                  <SAddBtn label={`+ Add pot for ${label}`} onClick={() => setShortPots(l => [...l, { localId: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[l.length % POT_COLORS.length], owner, potType: 'short_term' }])} />
+                  {pots.map(p => {
+                    const asPotDraft: PotDraft = { id: p.localId, name: p.name, targetAmount: p.targetAmount, targetMonths: p.targetMonths, color: p.color, owner: p.owner, potType: 'short_term', targetMode: p.targetMode, targetDate: p.targetDate };
+                    return (
+                      <ShortTermPotRow key={p.localId} pot={asPotDraft} paydayDay={hh.payday_day}
+                        onUpdate={patch => setShortPots(l => l.map(x => x.localId === p.localId ? { ...x, name: patch.name ?? x.name, targetAmount: patch.targetAmount ?? x.targetAmount, targetMonths: patch.targetMonths ?? x.targetMonths, targetMode: patch.targetMode ?? x.targetMode, targetDate: patch.targetDate !== undefined ? patch.targetDate : x.targetDate } : x))}
+                        onRemove={() => setShortPots(l => l.map(x => x.localId === p.localId ? { ...x, deleted: true } : x))} />
+                    );
+                  })}
+                  <SAddBtn label={`+ Add pot for ${label}`} onClick={() => setShortPots(l => [...l, { localId: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[l.length % POT_COLORS.length], owner, potType: 'short_term', targetMode: 'months' }])} />
                 </div>
               );
             })}
