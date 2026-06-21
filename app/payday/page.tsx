@@ -317,7 +317,7 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
           {jointFixed.length>0 && <><SLabel>Fixed bills</SLabel>{jointFixed.map(b=><BillRow key={b.id} name={b.name} amount={Number(b.amount)} splitA={isPartner?`${hh.person_a_name}: ${fmt(Number(b.amount)*splitA/100)}`:undefined} splitB={isPartner?`${hh.person_b_name}: ${fmt(Number(b.amount)*splitB/100)}`:undefined} />)}</>}
           {jointExtras.length>0 && <><SLabel>One-offs this month</SLabel>{jointExtras.map(b=>{const who=b.category==='joint_extra_a'?hh.person_a_name:b.category==='joint_extra_b'?hh.person_b_name:undefined;return <BillRow key={b.id} name={b.name} amount={Number(b.amount)} tag={who?`${who} only`:undefined} />;})}</>}
         </div>
-        <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-3 mt-3"><span className="text-gray-600">Total joint outgoings</span><span>{fmt(jointFixedTotal+jointExtras.reduce((s,b)=>s+Number(b.amount),0))}</span></div>
+        <div className="flex justify-between text-sm font-bold border-t border-[#c1c9be] pt-3 mt-3"><span className="text-[#414940]">Total joint outgoings</span><span className="text-[#181c1c]">{fmt(jointFixedTotal+jointExtras.reduce((s,b)=>s+Number(b.amount),0))}</span></div>
       </DSection>
       <div className={isPartner ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : ''}>
         <PersonCard name={hh.person_a_name} income={Number(sess.income_a)} jointContrib={jointContribA} personalBills={personalBillsA} debts={debtsA} spending={Number(sess.spending_a)} travel={Number(sess.travel_a)} personalTotal={personalTotalA} savingsTotal={totalSavingsA} />
@@ -637,25 +637,25 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
         <div className="mt-4">
           <SLabel>One-offs this month</SLabel>
           {extras.map(e => (
-            <div key={e._key} className="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0">
+            <div key={e._key} className="flex items-center gap-2 py-2 border-b border-[#c1c9be] last:border-0">
               <input value={e.name} onChange={ev=>setExtras(l=>l.map(x=>x._key===e._key?{...x,name:ev.target.value}:x))} placeholder="Description"
-                className="flex-1 text-sm text-gray-700 bg-transparent border-0 focus:outline-none focus:bg-gray-50 rounded px-1 -mx-1" />
+                className="flex-1 text-sm text-[#181c1c] bg-transparent border-0 focus:outline-none focus:bg-[#f1f4f2] rounded-[12px] px-1 -mx-1" />
               <div className="relative w-24 shrink-0">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span>
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs">£</span>
                 <input type="number" min="0" value={e.amount} onChange={ev=>setExtras(l=>l.map(x=>x._key===e._key?{...x,amount:ev.target.value}:x))} placeholder="0"
-                  className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none text-right" />
+                  className="w-full pl-6 pr-2 py-1.5 text-sm border border-[#c1c9be] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" />
               </div>
               {isPartner && (
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+                <div className="flex rounded-lg border border-[#c1c9be] overflow-hidden shrink-0">
                   {(['both','a','b'] as const).map(w => (
                     <button key={w} onClick={()=>setExtras(l=>l.map(x=>x._key===e._key?{...x,who:w}:x))}
-                      className={`px-2 py-1.5 text-xs font-medium transition-colors ${e.who===w?'bg-[#1a1a1a] text-white':'text-gray-500 hover:bg-gray-50'}`}>
+                      className={`px-2 py-1.5 text-xs font-semibold transition-colors ${e.who===w?'bg-[#396940] text-white':'text-[#414940] hover:bg-[#f1f4f2]'}`}>
                       {whoLabel(w)}
                     </button>
                   ))}
                 </div>
               )}
-              <button onClick={()=>setExtras(l=>l.filter(x=>x._key!==e._key))} className="text-gray-300 hover:text-red-400 text-lg leading-none w-5">×</button>
+              <button onClick={()=>setExtras(l=>l.filter(x=>x._key!==e._key))} className="text-[#c1c9be] hover:text-[#ba1a1a] text-lg leading-none w-5">×</button>
             </div>
           ))}
           <AddBtn label="+ Add one-off" onClick={()=>setExtras(l=>[...l,{_key:uid(),name:'',amount:'',who:'both'}])} />
@@ -665,12 +665,12 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       {/* Per-person outgoings */}
       <div className={isPartner?'grid grid-cols-1 md:grid-cols-2 gap-4':''}>
         {/* Person A */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="font-semibold text-gray-900">👤 {hh.person_a_name}</h3>
-            {iA>0 && <span className="text-sm text-gray-400">{fmt(iA)}</span>}
+        <div className="bg-white rounded-[20px] p-5 space-y-4 shadow-[0_2px_20px_rgba(57,105,64,0.08)]">
+          <div className="flex items-center justify-between border-b border-[#c1c9be] pb-3">
+            <h3 className="font-bold text-[#181c1c]">👤 {hh.person_a_name}</h3>
+            {iA>0 && <span className="text-sm text-[#414940] font-medium">{fmt(iA)}</span>}
           </div>
-          {isPartner && iA>0 && jointContribA>0 && <div className="text-xs text-gray-400 -mt-1">Joint contribution: {fmt(jointContribA)}</div>}
+          {isPartner && iA>0 && jointContribA>0 && <div className="text-xs text-[#717970] -mt-1">Joint contribution: {fmt(jointContribA)}</div>}
           <SLabel>Personal bills</SLabel>
           {billsA.map(b=><EditBillRow key={b._key} bill={b} onChange={(f,v)=>setBillsA(l=>l.map(x=>x._key===b._key?{...x,[f]:v}:x))} onRemove={()=>setBillsA(l=>l.filter(x=>x._key!==b._key))} />)}
           <AddBtn label="+ Add personal bill" onClick={()=>setBillsA(l=>[...l,{_key:uid(),name:'',amount:''}])} />
@@ -679,20 +679,20 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
           <AddBtn label="+ Add debt repayment" onClick={()=>setDebtsA(l=>[...l,{_key:uid(),name:'',amount:''}])} />
           <SLabel>Lifestyle</SLabel>
           <div className="space-y-2">
-            <div className="flex items-center gap-2"><span className="text-sm text-gray-600 flex-1">Spending money</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span><input type="number" min="0" value={spendingA} onChange={e=>setSpendingA(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" /></div></div>
-            <div className="flex items-center gap-2"><span className="text-sm text-gray-600 flex-1">Travel</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span><input type="number" min="0" value={travelA} onChange={e=>setTravelA(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" /></div></div>
+            <div className="flex items-center gap-2"><span className="text-sm text-[#414940] flex-1">Spending money</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs">£</span><input type="number" min="0" value={spendingA} onChange={e=>setSpendingA(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-[#c1c9be] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" /></div></div>
+            <div className="flex items-center gap-2"><span className="text-sm text-[#414940] flex-1">Travel</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs">£</span><input type="number" min="0" value={travelA} onChange={e=>setTravelA(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-[#c1c9be] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" /></div></div>
           </div>
-          {personalTotalA>0 && <div className="flex justify-between text-xs text-gray-400 border-t border-gray-100 pt-2"><span>Personal total</span><span className="font-medium">{fmt(personalTotalA)}</span></div>}
+          {personalTotalA>0 && <div className="flex justify-between text-xs text-[#717970] border-t border-[#c1c9be] pt-2"><span>Personal total</span><span className="font-semibold">{fmt(personalTotalA)}</span></div>}
         </div>
 
         {/* Person B */}
         {isPartner && (
-          <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="font-semibold text-gray-900">👤 {hh.person_b_name}</h3>
-              {iB>0 && <span className="text-sm text-gray-400">{fmt(iB)}</span>}
+          <div className="bg-white rounded-[20px] p-5 space-y-4 shadow-[0_2px_20px_rgba(57,105,64,0.08)]">
+            <div className="flex items-center justify-between border-b border-[#c1c9be] pb-3">
+              <h3 className="font-bold text-[#181c1c]">👤 {hh.person_b_name}</h3>
+              {iB>0 && <span className="text-sm text-[#414940] font-medium">{fmt(iB)}</span>}
             </div>
-            {iB>0 && jointContribB>0 && <div className="text-xs text-gray-400 -mt-1">Joint contribution: {fmt(jointContribB)}</div>}
+            {iB>0 && jointContribB>0 && <div className="text-xs text-[#717970] -mt-1">Joint contribution: {fmt(jointContribB)}</div>}
             <SLabel>Personal bills</SLabel>
             {billsB.map(b=><EditBillRow key={b._key} bill={b} onChange={(f,v)=>setBillsB(l=>l.map(x=>x._key===b._key?{...x,[f]:v}:x))} onRemove={()=>setBillsB(l=>l.filter(x=>x._key!==b._key))} />)}
             <AddBtn label="+ Add personal bill" onClick={()=>setBillsB(l=>[...l,{_key:uid(),name:'',amount:''}])} />
@@ -701,10 +701,10 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
             <AddBtn label="+ Add debt repayment" onClick={()=>setDebtsB(l=>[...l,{_key:uid(),name:'',amount:''}])} />
             <SLabel>Lifestyle</SLabel>
             <div className="space-y-2">
-              <div className="flex items-center gap-2"><span className="text-sm text-gray-600 flex-1">Spending money</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span><input type="number" min="0" value={spendingB} onChange={e=>setSpendingB(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" /></div></div>
-              <div className="flex items-center gap-2"><span className="text-sm text-gray-600 flex-1">Travel</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span><input type="number" min="0" value={travelB} onChange={e=>setTravelB(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" /></div></div>
+              <div className="flex items-center gap-2"><span className="text-sm text-[#414940] flex-1">Spending money</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs">£</span><input type="number" min="0" value={spendingB} onChange={e=>setSpendingB(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-[#c1c9be] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" /></div></div>
+              <div className="flex items-center gap-2"><span className="text-sm text-[#414940] flex-1">Travel</span><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs">£</span><input type="number" min="0" value={travelB} onChange={e=>setTravelB(e.target.value)} placeholder="0" className="w-full pl-6 pr-2 py-1.5 text-sm border border-[#c1c9be] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" /></div></div>
             </div>
-            {personalTotalB>0 && <div className="flex justify-between text-xs text-gray-400 border-t border-gray-100 pt-2"><span>Personal total</span><span className="font-medium">{fmt(personalTotalB)}</span></div>}
+            {personalTotalB>0 && <div className="flex justify-between text-xs text-[#717970] border-t border-[#c1c9be] pt-2"><span>Personal total</span><span className="font-semibold">{fmt(personalTotalB)}</span></div>}
           </div>
         )}
       </div>
@@ -718,12 +718,12 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => {
                 const pct = parseFloat(percentsA[p.id])||0; const amount = availableA*(pct/100);
                 return (
-                  <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div key={p.id} className="flex items-center gap-2 bg-[#ebeeed] rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
+                    <span className="text-sm flex-1 text-[#181c1c] truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsA[p.id]??''} onChange={e=>setPercentsA(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
+                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
                     </div>
                     <span className="text-xs text-gray-400 w-16 text-right tabular-nums shrink-0">{amount>0?fmt(amount):'—'}</span>
@@ -734,12 +734,12 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => {
                 const pct = parseFloat(percentsA[p.id])||0; const amount = availableA*(pct/100);
                 return (
-                  <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div key={p.id} className="flex items-center gap-2 bg-[#ebeeed] rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
+                    <span className="text-sm flex-1 text-[#181c1c] truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsA[p.id]??''} onChange={e=>setPercentsA(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
+                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
                     </div>
                     <span className="text-xs text-gray-400 w-16 text-right tabular-nums shrink-0">{amount>0?fmt(amount):'—'}</span>
@@ -748,7 +748,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               })}
             </div>
             <AddPotRow owner="person_a" onAdd={addPot} />
-            <div className={`flex justify-between text-xs mt-2 font-medium ${aReady?'text-emerald-600':Math.abs(100-allocPctA)<50?'text-gray-400':'text-amber-600'}`}>
+            <div className={`flex justify-between text-xs mt-2 font-semibold ${aReady?'text-[#7bae7f]':Math.abs(100-allocPctA)<50?'text-[#717970]':'text-[#f4a261]'}`}>
               <span>{Math.round(allocPctA)}% allocated</span>
               <span>{aReady?'✓ All allocated':`${(100-allocPctA).toFixed(0)}% remaining`}</span>
             </div>
@@ -761,12 +761,12 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_b').map(p => {
                 const pct = parseFloat(percentsB[p.id])||0; const amount = availableB*(pct/100);
                 return (
-                  <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div key={p.id} className="flex items-center gap-2 bg-[#ebeeed] rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
+                    <span className="text-sm flex-1 text-[#181c1c] truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsB[p.id]??''} onChange={e=>setPercentsB(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
+                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
                     </div>
                     <span className="text-xs text-gray-400 w-16 text-right tabular-nums shrink-0">{amount>0?fmt(amount):'—'}</span>
@@ -777,12 +777,12 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_b').map(p => {
                 const pct = parseFloat(percentsB[p.id])||0; const amount = availableB*(pct/100);
                 return (
-                  <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div key={p.id} className="flex items-center gap-2 bg-[#ebeeed] rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
+                    <span className="text-sm flex-1 text-[#181c1c] truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsB[p.id]??''} onChange={e=>setPercentsB(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
+                        className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
                     </div>
                     <span className="text-xs text-gray-400 w-16 text-right tabular-nums shrink-0">{amount>0?fmt(amount):'—'}</span>
@@ -790,7 +790,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 );
               })}
             </div>
-            <div className={`flex justify-between text-xs mt-2 font-medium ${bReady?'text-emerald-600':Math.abs(100-allocPctB)<50?'text-gray-400':'text-amber-600'}`}>
+            <div className={`flex justify-between text-xs mt-2 font-semibold ${bReady?'text-[#7bae7f]':Math.abs(100-allocPctB)<50?'text-[#717970]':'text-[#f4a261]'}`}>
               <span>{Math.round(allocPctB)}% allocated</span>
               <span>{bReady?'✓ All allocated':`${(100-allocPctB).toFixed(0)}% remaining`}</span>
             </div>
@@ -801,8 +801,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
 
       {/* Summary preview */}
       {(iA>0||iB>0) && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
-          <div className="text-sm font-semibold text-gray-700 mb-3">Preview</div>
+        <div className="bg-white rounded-[20px] p-5 space-y-3 shadow-[0_2px_20px_rgba(57,105,64,0.08)]">
+          <div className="text-sm font-bold text-[#181c1c] mb-3">Preview</div>
           <Recap label="Total income" value={fmt(iA+iB)} />
           <Recap label="Joint outgoings" value={fmt(jointTotal+extras.reduce((s,e)=>s+(parseFloat(e.amount)||0),0))} negative />
           <Recap label={`${hh.person_a_name}'s personal`} value={fmt(personalTotalA)} negative />
@@ -815,21 +815,21 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       <div className="h-24" />
 
       {/* Sticky footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-gray-100 px-4 py-3 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-[#c1c9be] px-4 py-3 safe-bottom">
         <div className="max-w-2xl mx-auto space-y-2">
           {!canLock && (aReady===false||bReady===false) && (
-            <div className="text-xs text-amber-600 text-center">
+            <div className="text-xs text-[#f4a261] text-center font-medium">
               {!aReady && <span>{hh.person_a_name}: {(100-allocPctA).toFixed(0)}% still to allocate · </span>}
               {isPartner&&!bReady && <span>{hh.person_b_name}: {(100-allocPctB).toFixed(0)}% still to allocate</span>}
             </div>
           )}
           <div className="flex gap-3">
             <button onClick={()=>persist(false)} disabled={saving}
-              className="flex-1 border border-gray-200 py-3 rounded-xl text-sm font-medium hover:border-gray-400 disabled:opacity-40 transition-colors bg-white">
+              className="flex-1 border-2 border-[#7bae7f] py-3 rounded-full text-sm font-semibold text-[#396940] hover:bg-[#f1f4f2] disabled:opacity-40 transition-colors bg-white">
               {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
             </button>
             <button onClick={()=>persist(true)} disabled={!canLock||saving}
-              className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors">
+              className="flex-1 bg-[#7bae7f] text-white py-3 rounded-full font-bold disabled:opacity-40 hover:bg-[#396940] transition-colors">
               {saving ? 'Saving…' : 'Lock in 🔒'}
             </button>
           </div>
@@ -843,26 +843,26 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
 
 function DSection({ title, icon, subtitle, children }: { title: string; icon: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
-      <div><div className="flex items-center gap-2 mb-0.5"><span>{icon}</span><h3 className="font-semibold text-gray-900">{title}</h3></div>{subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}</div>
+    <div className="bg-white rounded-[20px] p-5 space-y-3 shadow-[0_2px_20px_rgba(57,105,64,0.08)]">
+      <div><div className="flex items-center gap-2 mb-0.5"><span>{icon}</span><h3 className="font-bold text-[#181c1c]">{title}</h3></div>{subtitle && <p className="text-xs text-[#717970]">{subtitle}</p>}</div>
       {children}
     </div>
   );
 }
 function SLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-xs text-gray-400 uppercase tracking-wide font-medium pt-1 pb-0.5">{children}</div>;
+  return <div className="text-xs text-[#717970] uppercase tracking-wider font-bold pt-1 pb-0.5">{children}</div>;
 }
 function ActionCard({ label, amount }: { label: string; amount: number }) {
-  return <div className="rounded-xl p-3 bg-blue-50 border border-blue-100"><div className="text-xs text-gray-500 mb-1">{label}</div><div className="text-lg font-bold text-blue-700">{fmt(amount)}</div></div>;
+  return <div className="rounded-xl p-3 bg-[#ebeeed]"><div className="text-xs text-[#414940] mb-1 font-medium">{label}</div><div className="text-lg font-bold text-[#396940]">{fmt(amount)}</div></div>;
 }
 function BillRow({ name, amount, splitA, splitB, tag }: { name: string; amount: number; splitA?: string; splitB?: string; tag?: string }) {
   return (
-    <div className="py-2 border-b border-gray-50 last:border-0">
+    <div className="py-2 border-b border-[#c1c9be] last:border-0">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2"><span className="text-sm text-gray-700">{name}</span>{tag && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{tag}</span>}</div>
-        <span className="text-sm font-medium">{fmt(amount)}</span>
+        <div className="flex items-center gap-2"><span className="text-sm text-[#181c1c]">{name}</span>{tag && <span className="text-xs bg-[#ebeeed] text-[#414940] px-1.5 py-0.5 rounded-full">{tag}</span>}</div>
+        <span className="text-sm font-semibold text-[#181c1c]">{fmt(amount)}</span>
       </div>
-      {(splitA||splitB) && <div className="flex gap-4 mt-0.5">{splitA && <span className="text-xs text-gray-400">{splitA}</span>}{splitB && <span className="text-xs text-gray-400">{splitB}</span>}</div>}
+      {(splitA||splitB) && <div className="flex gap-4 mt-0.5">{splitA && <span className="text-xs text-[#717970]">{splitA}</span>}{splitB && <span className="text-xs text-[#717970]">{splitB}</span>}</div>}
     </div>
   );
 }
@@ -870,33 +870,33 @@ function PersonCard({ name, income, jointContrib, personalBills, debts, spending
   name: string; income: number; jointContrib: number; personalBills: SessionBill[]; debts: SessionBill[]; spending: number; travel: number; personalTotal: number; savingsTotal: number;
 }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-4">
-      <div className="flex items-center justify-between border-b border-gray-100 pb-3"><h3 className="font-semibold text-gray-900">👤 {name}</h3><span className="text-sm font-medium text-gray-500">{fmt(income)}</span></div>
-      <div className="bg-blue-50 rounded-xl px-4 py-3 flex items-center justify-between"><div><div className="text-xs text-blue-600 font-medium">Transfer to joint account</div></div><div className="text-lg font-bold text-blue-700">{fmt(jointContrib)}</div></div>
+    <div className="bg-white rounded-[20px] p-5 space-y-4 shadow-[0_2px_20px_rgba(57,105,64,0.08)]">
+      <div className="flex items-center justify-between border-b border-[#c1c9be] pb-3"><h3 className="font-bold text-[#181c1c]">👤 {name}</h3><span className="text-sm font-semibold text-[#414940]">{fmt(income)}</span></div>
+      <div className="bg-[#f1f4f2] rounded-xl px-4 py-3 flex items-center justify-between"><div><div className="text-xs text-[#396940] font-semibold">Transfer to joint account</div></div><div className="text-lg font-bold text-[#396940]">{fmt(jointContrib)}</div></div>
       {(personalBills.length>0||debts.length>0||spending>0||travel>0) && (
         <div><SLabel>Personal outgoings</SLabel><div className="space-y-0">
-          {personalBills.map(b=><div key={b.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"><span className="text-sm text-gray-600">{b.name}</span><span className="text-sm font-medium">{fmt(Number(b.amount))}</span></div>)}
-          {debts.map(d=><div key={d.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"><span className="text-sm text-gray-600 flex items-center gap-1.5"><span className="text-xs bg-orange-100 text-orange-600 px-1 rounded">debt</span>{d.name}</span><span className="text-sm font-medium">{fmt(Number(d.amount))}</span></div>)}
-          {spending>0 && <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"><span className="text-sm text-gray-600">Spending money</span><span className="text-sm font-medium">{fmt(spending)}</span></div>}
-          {travel>0 && <div className="flex items-center justify-between py-2 border-b border-gray-50"><span className="text-sm text-gray-600">Travel</span><span className="text-sm font-medium">{fmt(travel)}</span></div>}
-          <div className="flex justify-between text-xs text-gray-400 pt-1"><span>Personal total</span><span className="font-medium">{fmt(personalTotal)}</span></div>
+          {personalBills.map(b=><div key={b.id} className="flex items-center justify-between py-2 border-b border-[#c1c9be] last:border-0"><span className="text-sm text-[#414940]">{b.name}</span><span className="text-sm font-semibold">{fmt(Number(b.amount))}</span></div>)}
+          {debts.map(d=><div key={d.id} className="flex items-center justify-between py-2 border-b border-[#c1c9be] last:border-0"><span className="text-sm text-[#414940] flex items-center gap-1.5"><span className="text-xs bg-[#f4a261]/20 text-[#8e4e14] px-1.5 py-0.5 rounded-full">debt</span>{d.name}</span><span className="text-sm font-semibold">{fmt(Number(d.amount))}</span></div>)}
+          {spending>0 && <div className="flex items-center justify-between py-2 border-b border-[#c1c9be] last:border-0"><span className="text-sm text-[#414940]">Spending money</span><span className="text-sm font-semibold">{fmt(spending)}</span></div>}
+          {travel>0 && <div className="flex items-center justify-between py-2 border-b border-[#c1c9be]"><span className="text-sm text-[#414940]">Travel</span><span className="text-sm font-semibold">{fmt(travel)}</span></div>}
+          <div className="flex justify-between text-xs text-[#717970] pt-1"><span>Personal total</span><span className="font-semibold">{fmt(personalTotal)}</span></div>
         </div></div>
       )}
-      <div className="border-t border-gray-100 pt-3"><div className="flex justify-between text-sm font-semibold"><span className="text-gray-600">Remainder after savings</span><span className={income-jointContrib-personalTotal-savingsTotal<-0.01?'text-red-600':'text-gray-900'}>{fmt(income-jointContrib-personalTotal-savingsTotal)}</span></div></div>
+      <div className="border-t border-[#c1c9be] pt-3"><div className="flex justify-between text-sm font-bold"><span className="text-[#414940]">Remainder after savings</span><span className={income-jointContrib-personalTotal-savingsTotal<-0.01?'text-[#ba1a1a]':'text-[#181c1c]'}>{fmt(income-jointContrib-personalTotal-savingsTotal)}</span></div></div>
     </div>
   );
 }
 function SavingsCard({ name, allocs, potMap, total, available }: { name: string; allocs: Allocation[]; potMap: Record<string,Pot>; total: number; available: number }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
-      <div><div className="flex items-center gap-2 mb-0.5"><span>💰</span><h3 className="font-semibold text-gray-900">{name}&apos;s savings</h3></div><p className="text-xs text-gray-400">Transfers to make this month</p></div>
+    <div className="bg-white rounded-[20px] p-5 space-y-3 shadow-[0_2px_20px_rgba(57,105,64,0.08)]">
+      <div><div className="flex items-center gap-2 mb-0.5"><span>💰</span><h3 className="font-bold text-[#181c1c]">{name}&apos;s savings</h3></div><p className="text-xs text-[#717970]">Transfers to make this month</p></div>
       <div className="space-y-0">
-        {allocs.map(a=>{const pot=potMap[a.pot_id];if(!pot)return null;const pct=available>0?Math.round(Number(a.amount)/available*100):0;return(<div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0"><div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:pot.color}} /><span className="text-sm flex-1 text-gray-700">{pot.name}</span>{pct>0&&<span className="text-xs text-gray-400 w-10 text-right">{pct}%</span>}<span className="text-sm font-semibold text-emerald-700">{fmt(Number(a.amount))}</span></div>);})}
+        {allocs.map(a=>{const pot=potMap[a.pot_id];if(!pot)return null;const pct=available>0?Math.round(Number(a.amount)/available*100):0;return(<div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-[#c1c9be] last:border-0"><div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:pot.color}} /><span className="text-sm flex-1 text-[#181c1c]">{pot.name}</span>{pct>0&&<span className="text-xs text-[#717970] w-10 text-right">{pct}%</span>}<span className="text-sm font-bold text-[#396940]">{fmt(Number(a.amount))}</span></div>);})}
       </div>
-      <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-3"><span className="text-gray-600">Total to save</span><span className="text-emerald-600">{fmt(total)}</span></div>
+      <div className="flex justify-between text-sm font-bold border-t border-[#c1c9be] pt-3"><span className="text-[#414940]">Total to save</span><span className="text-[#396940]">{fmt(total)}</span></div>
     </div>
   );
 }
 function Recap({ label, value, negative, positive, bold }: { label: string; value: string; negative?: boolean; positive?: boolean; bold?: boolean }) {
-  return <div className={`flex justify-between text-sm ${bold?'font-bold':''}`}><span className="text-gray-500">{label}</span><span className={positive?'text-emerald-600 font-semibold':negative?'text-gray-700':'font-medium'}>{negative?'−':''}{value}</span></div>;
+  return <div className={`flex justify-between text-sm ${bold?'font-bold':''}`}><span className="text-[#414940]">{label}</span><span className={positive?'text-[#396940] font-bold':negative?'text-[#414940] font-medium':'font-medium text-[#181c1c]'}>{negative?'−':''}{value}</span></div>;
 }
