@@ -8,13 +8,24 @@ type Mode = 'solo' | 'partner';
 
 interface BillDraft { id: string; name: string; amount: string; }
 interface DebtDraft { id: string; name: string; amount: string; person: 'a' | 'b'; }
+type AccountType = 'savings_account' | 'cash_isa' | 'stocks_isa' | 'lisa' | 'pension' | 'other';
 interface PotDraft {
   id: string; name: string; targetAmount: string; targetMonths: string;
   color: string; owner: 'person_a' | 'person_b' | 'joint'; potType: 'short_term' | 'long_term';
   targetMode?: 'months' | 'date'; targetDate?: string;
+  accountType?: AccountType; provider?: string;
 }
 
 const POT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6','#64748b'];
+
+const ACCOUNT_TYPES: { value: AccountType; label: string; color: string }[] = [
+  { value: 'savings_account', label: 'Savings',  color: '#10b981' },
+  { value: 'cash_isa',        label: 'Cash ISA',  color: '#3b82f6' },
+  { value: 'stocks_isa',      label: 'S&S ISA',   color: '#6366f1' },
+  { value: 'lisa',            label: 'LISA',       color: '#8b5cf6' },
+  { value: 'pension',         label: 'Pension',    color: '#64748b' },
+  { value: 'other',           label: 'Other',      color: '#f59e0b' },
+];
 
 const DEFAULT_JOINT_BILLS: BillDraft[] = [
   { id: 'b1', name: 'Mortgage / Rent', amount: '' },
@@ -29,10 +40,7 @@ const DEFAULT_JOINT_BILLS: BillDraft[] = [
 const DEFAULT_SHORT_TERM: Omit<PotDraft, 'owner'>[] = [];
 // Savings pots are always per-person — no joint savings
 
-const DEFAULT_LONG_TERM: Omit<PotDraft, 'owner'>[] = [
-  { id: 'lt1', name: 'ISA', targetAmount: '', targetMonths: '', color: '#6366f1', potType: 'long_term' },
-  { id: 'lt2', name: 'Trading 212', targetAmount: '', targetMonths: '', color: '#3b82f6', potType: 'long_term' },
-];
+const DEFAULT_LONG_TERM: Omit<PotDraft, 'owner'>[] = [];
 
 function uid() { return Math.random().toString(36).slice(2); }
 
@@ -138,10 +146,11 @@ export default function SetupPage() {
     setShortTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[p.length % POT_COLORS.length], owner, potType: 'short_term', targetMode: 'months' }]);
   }
   function addLongTermFor(owner: 'person_a' | 'person_b' | 'joint') {
-    setLongTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '', color: POT_COLORS[p.length % POT_COLORS.length], owner, potType: 'long_term' }]);
+    const defaultType = ACCOUNT_TYPES[0];
+    setLongTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '', color: defaultType.color, owner, potType: 'long_term', accountType: defaultType.value, provider: '' }]);
   }
-  function updatePot(list: PotDraft[], set: (l: PotDraft[]) => void, id: string, field: keyof PotDraft, val: string) {
-    set(list.map(p => p.id === id ? { ...p, [field]: val } : p));
+  function updatePot(list: PotDraft[], set: (l: PotDraft[]) => void, id: string, patch: Partial<PotDraft>) {
+    set(list.map(p => p.id === id ? { ...p, ...patch } : p));
   }
 
   async function finish() {
@@ -221,6 +230,7 @@ export default function SetupPage() {
             targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null,
             targetMonths: p.targetMonths ? parseInt(p.targetMonths) : null,
             color: p.color, owner: p.owner, potType: p.potType, sortOrder: i,
+            accountType: p.accountType ?? null, provider: p.provider ?? null,
           }),
         })
       ));
@@ -504,7 +514,7 @@ export default function SetupPage() {
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameA || 'Person A'}</div>
                   {shortTermPots.filter(p => p.owner === 'person_a').map(pot => (
                     <ShortTermPotRow key={pot.id} pot={pot}
-                      onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                      onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)}
                       onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
                   ))}
                   <button onClick={() => addShortTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add goal for {nameA || 'Person A'}</button>
@@ -514,7 +524,7 @@ export default function SetupPage() {
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameB || 'Person B'}</div>
                   {shortTermPots.filter(p => p.owner === 'person_b').map(pot => (
                     <ShortTermPotRow key={pot.id} pot={pot}
-                      onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                      onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)}
                       onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
                   ))}
                   <button onClick={() => addShortTermFor('person_b')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add goal for {nameB || 'Person B'}</button>
@@ -524,7 +534,7 @@ export default function SetupPage() {
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Joint</div>
                   {shortTermPots.filter(p => p.owner === 'joint').map(pot => (
                     <ShortTermPotRow key={pot.id} pot={pot}
-                      onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                      onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)}
                       onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
                   ))}
                   <button onClick={() => addShortTermFor('joint')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add joint goal</button>
@@ -534,7 +544,7 @@ export default function SetupPage() {
               <>
                 {shortTermPots.map(pot => (
                   <ShortTermPotRow key={pot.id} pot={pot}
-                    onUpdate={(f, v) => updatePot(shortTermPots, setShortTermPots, pot.id, f, v)}
+                    onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)}
                     onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
                 ))}
                 <button onClick={() => addShortTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add savings goal</button>
@@ -562,7 +572,7 @@ export default function SetupPage() {
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameA || 'Person A'}</div>
                   {longTermPots.filter(p => p.owner === 'person_a').map(pot => (
                     <LongTermPotRow key={pot.id} pot={pot}
-                      onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                      onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)}
                       onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
                   ))}
                   <button onClick={() => addLongTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account for {nameA || 'Person A'}</button>
@@ -572,7 +582,7 @@ export default function SetupPage() {
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameB || 'Person B'}</div>
                   {longTermPots.filter(p => p.owner === 'person_b').map(pot => (
                     <LongTermPotRow key={pot.id} pot={pot}
-                      onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                      onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)}
                       onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
                   ))}
                   <button onClick={() => addLongTermFor('person_b')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account for {nameB || 'Person B'}</button>
@@ -582,7 +592,7 @@ export default function SetupPage() {
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Joint</div>
                   {longTermPots.filter(p => p.owner === 'joint').map(pot => (
                     <LongTermPotRow key={pot.id} pot={pot}
-                      onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                      onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)}
                       onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
                   ))}
                   <button onClick={() => addLongTermFor('joint')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add joint account</button>
@@ -592,7 +602,7 @@ export default function SetupPage() {
               <>
                 {longTermPots.map(pot => (
                   <LongTermPotRow key={pot.id} pot={pot}
-                    onUpdate={(f, v) => updatePot(longTermPots, setLongTermPots, pot.id, f, v)}
+                    onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)}
                     onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
                 ))}
                 <button onClick={() => addLongTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account / platform</button>
@@ -706,7 +716,7 @@ function LifestylePersonBlock({ name, spending, onSpending, transport, onTranspo
 
 function ShortTermPotRow({ pot, onUpdate, onRemove }: {
   pot: PotDraft;
-  onUpdate: (f: keyof PotDraft, v: string) => void;
+  onUpdate: (patch: Partial<PotDraft>) => void;
   onRemove: () => void;
 }) {
   const mode = pot.targetMode ?? 'months';
@@ -745,7 +755,7 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
           className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
           placeholder="e.g. Holiday Fund"
           value={pot.name}
-          onChange={e => onUpdate('name', e.target.value)}
+          onChange={e => onUpdate({ name: e.target.value })}
         />
         <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none px-1">×</button>
       </div>
@@ -758,18 +768,18 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
             className="w-full pl-7 pr-2 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
             placeholder="e.g. 2000"
             value={pot.targetAmount}
-            onChange={e => onUpdate('targetAmount', e.target.value)}
+            onChange={e => onUpdate({ targetAmount: e.target.value })}
           />
         </div>
       </div>
 
       <div>
         <div className="flex rounded-xl border border-gray-200 overflow-hidden mb-2">
-          <button onClick={() => onUpdate('targetMode', 'months')}
+          <button onClick={() => onUpdate({ targetMode: 'months' })}
             className={`flex-1 text-xs py-2 font-medium transition-colors ${mode === 'months' ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Blend over months
           </button>
-          <button onClick={() => onUpdate('targetMode', 'date')}
+          <button onClick={() => onUpdate({ targetMode: 'date' })}
             className={`flex-1 text-xs py-2 font-medium transition-colors ${mode === 'date' ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             By payday date
           </button>
@@ -779,11 +789,11 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
             placeholder="e.g. 12"
             value={pot.targetMonths}
-            onChange={e => onUpdate('targetMonths', e.target.value)}
+            onChange={e => onUpdate({ targetMonths: e.target.value })}
           />
         ) : (
           <select value={pot.targetDate ?? ''}
-            onChange={e => onUpdate('targetDate', e.target.value)}
+            onChange={e => onUpdate({ targetDate: e.target.value })}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
             <option value="">Select target payday…</option>
             {paydayOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
@@ -802,31 +812,81 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
 
 function LongTermPotRow({ pot, onUpdate, onRemove }: {
   pot: PotDraft;
-  onUpdate: (f: keyof PotDraft, v: string) => void;
+  onUpdate: (patch: Partial<PotDraft>) => void;
   onRemove: () => void;
 }) {
+  const [nameEdited, setNameEdited] = useState(false);
+
+  function autoName(provider: string, accountType: AccountType): string {
+    const labels: Record<AccountType, string> = { savings_account: 'Savings', cash_isa: 'Cash ISA', stocks_isa: 'S&S ISA', lisa: 'LISA', pension: 'Pension', other: '' };
+    const suffix = labels[accountType] ?? '';
+    return provider && suffix ? `${provider} ${suffix}` : provider || suffix;
+  }
+
+  function handleTypeChange(at: AccountType) {
+    const typeConf = ACCOUNT_TYPES.find(t => t.value === at)!;
+    const patch: Partial<PotDraft> = { accountType: at, color: typeConf.color };
+    if (!nameEdited) patch.name = autoName(pot.provider ?? '', at);
+    onUpdate(patch);
+  }
+
+  function handleProviderChange(provider: string) {
+    const patch: Partial<PotDraft> = { provider };
+    if (!nameEdited) patch.name = autoName(provider, pot.accountType ?? 'savings_account');
+    onUpdate(patch);
+  }
+
+  const selectedType = ACCOUNT_TYPES.find(t => t.value === (pot.accountType ?? 'savings_account'))!;
+
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
+      {/* Header: colour dot + remove */}
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded-full shrink-0" style={{ background: pot.color }} />
-        <input
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-          placeholder="e.g. ISA, Trading 212, Pension"
-          value={pot.name}
-          onChange={e => onUpdate('name', e.target.value)}
-        />
+        <span className="text-xs font-medium text-gray-500 flex-1">{selectedType.label}</span>
         <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none px-1">×</button>
       </div>
 
+      {/* Account type */}
+      <div className="flex gap-1.5 flex-wrap">
+        {ACCOUNT_TYPES.map(t => (
+          <button key={t.value} onClick={() => handleTypeChange(t.value)}
+            className={`text-xs px-2.5 py-1.5 rounded-full border font-medium transition-colors ${pot.accountType === t.value ? 'text-white border-transparent' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}
+            style={pot.accountType === t.value ? { background: t.color } : {}}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Provider */}
+      <input
+        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+        placeholder="Provider (e.g. Chase, Vanguard, Marcus)"
+        value={pot.provider ?? ''}
+        onChange={e => handleProviderChange(e.target.value)}
+      />
+
+      {/* Name override */}
       <div>
-        <label className="text-xs text-gray-400 mb-1 block">Monthly target (optional)</label>
+        <label className="text-xs text-gray-400 mb-1 block">Label (auto-generated, or customise)</label>
+        <input
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-600"
+          placeholder="e.g. Chase Savings"
+          value={pot.name}
+          onChange={e => { setNameEdited(true); onUpdate({ name: e.target.value }); }}
+        />
+      </div>
+
+      {/* Monthly contribution */}
+      <div>
+        <label className="text-xs text-gray-400 mb-1 block">Monthly contribution (optional)</label>
         <div className="relative w-36">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
           <input type="number" min="0"
             className="w-full pl-7 pr-2 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
             placeholder="0"
             value={pot.targetAmount}
-            onChange={e => onUpdate('targetAmount', e.target.value)}
+            onChange={e => onUpdate({ targetAmount: e.target.value })}
           />
         </div>
       </div>

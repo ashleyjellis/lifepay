@@ -128,6 +128,8 @@ export async function initSchema() {
     'ALTER TABLE savings_pots ADD COLUMN pot_type TEXT NOT NULL DEFAULT "short_term"',
     'ALTER TABLE savings_pots ADD COLUMN target_months INTEGER',
     'ALTER TABLE households ADD COLUMN payday_day INTEGER NOT NULL DEFAULT 25',
+    'ALTER TABLE savings_pots ADD COLUMN account_type TEXT',
+    'ALTER TABLE savings_pots ADD COLUMN provider TEXT',
   ];
 
   for (const sql of migrations) {

@@ -27,8 +27,10 @@ interface Allocation {
 
 interface Pot {
   id: string; name: string; color: string; owner: string; pot_type: string;
+  account_type?: string | null; provider?: string | null;
 }
 
+const ACCT_LABELS: Record<string, string> = { savings_account: 'Savings', cash_isa: 'Cash ISA', stocks_isa: 'S&S ISA', lisa: 'LISA', pension: 'Pension' };
 const fmt = (v: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(Math.abs(v));
 
@@ -510,7 +512,7 @@ function SavingsSection({ name, allocs, potMap, total, available }: {
           return (
             <div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: pot.color }} />
-              <span className="text-sm flex-1 text-gray-700">{pot.name}</span>
+              <span className="text-sm flex-1 text-gray-700">{pot.name}{pot.account_type && pot.pot_type === 'long_term' && ACCT_LABELS[pot.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[pot.account_type]}</span>}</span>
               <span className="text-xs text-gray-400 w-10 text-right">{available > 0 ? `${Math.round((Number(a.amount) / available) * 100)}%` : ''}</span>
               <span className="text-sm font-semibold text-emerald-700">{fmt2(Number(a.amount))}</span>
             </div>

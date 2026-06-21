@@ -19,7 +19,7 @@ interface SessionSummary {
 }
 interface SessionBill { id: string; name: string; amount: number; category: string; }
 interface Allocation { id: string; pot_id: string; amount: number; }
-interface Pot { id: string; name: string; color: string; owner: string; pot_type: string; }
+interface Pot { id: string; name: string; color: string; owner: string; pot_type: string; account_type?: string | null; provider?: string | null; }
 interface SessionDetail { session: SessionSummary; bills: SessionBill[]; allocations: Allocation[]; }
 
 function monthLabel(ym: string) {
@@ -48,6 +48,7 @@ function generateMonths(sessionDates: string[]): string[] {
   return months;
 }
 function uid() { return Math.random().toString(36).slice(2); }
+const ACCT_LABELS: Record<string, string> = { savings_account: 'Savings', cash_isa: 'Cash ISA', stocks_isa: 'S&S ISA', lisa: 'LISA', pension: 'Pension' };
 const fmt = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(Math.abs(v));
 export default function PaydayHome() {
   const router = useRouter();
@@ -611,7 +612,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 return (
                   <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}</span>
+                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsA[p.id]??''} onChange={e=>setPercentsA(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
                         className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
@@ -627,7 +628,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 return (
                   <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}</span>
+                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsA[p.id]??''} onChange={e=>setPercentsA(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
                         className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
@@ -654,7 +655,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 return (
                   <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}</span>
+                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsB[p.id]??''} onChange={e=>setPercentsB(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
                         className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
@@ -670,7 +671,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 return (
                   <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}</span>
+                    <span className="text-sm flex-1 text-gray-700 truncate">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-gray-400">· {ACCT_LABELS[p.account_type]}</span>}</span>
                     <div className="relative w-20 shrink-0">
                       <input type="number" min="0" max="100" value={percentsB[p.id]??''} onChange={e=>setPercentsB(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
                         className="w-full pr-6 pl-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
