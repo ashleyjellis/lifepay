@@ -59,6 +59,8 @@ export default function PaydayHome() {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Onboarding overlay: step 0 = none, 1 = congrats modal, 2 = pill highlight tooltip
+  const [onboardingStep, setOnboardingStep] = useState<0|1|2>(0);
 
   useEffect(() => {
     async function load() {
@@ -81,6 +83,13 @@ export default function PaydayHome() {
     }
     load();
   }, [router]);
+
+  useEffect(() => {
+    if (!loading && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('onboarding') === '1') {
+      setOnboardingStep(1);
+      router.replace('/payday');
+    }
+  }, [loading, router]);
 
   const loadDetail = useCallback(async (sessId: string) => {
     setDetailLoading(true); setDetail(null);
@@ -105,6 +114,15 @@ export default function PaydayHome() {
   const hh = household;
   const isPartner = hh.mode === 'partner';
   const curYM = toYM(new Date());
+  // Days until next payday (next month's payday_day)
+  const paydayDay = hh.payday_day ?? 25;
+  const daysUntilNextPayday = (() => {
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, paydayDay);
+    return Math.ceil((next.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  })();
+  // The lockable month (next month) for highlighting
+  const nextMonthYM = toYM(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
   const editableMonths = getEditableMonths();
   const months = generateMonths(sessions.map(s => s.date));
   const selectedSession = sessions.find(s => s.date.startsWith(selectedMonth));
@@ -117,6 +135,47 @@ export default function PaydayHome() {
 
   return (
     <div className="min-h-screen bg-[#faf9f7]">
+
+      {/* ── Onboarding step 1: Congratulations modal ── */}
+      {onboardingStep === 1 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center">
+            <div className="text-4xl mb-4">🎉</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Your baseline is set up!</h2>
+            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              This is your Payday baseline — it captures your income, bills, spending, and savings goals. Each month you&apos;ll lock in your actual payday to confirm everything still tracks and allocate any leftover money to your savings and investments.
+            </p>
+            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              You can update your baseline any time from the <strong>Setup</strong> section in the menu.
+            </p>
+            <button
+              onClick={() => { setOnboardingStep(2); setSelectedMonth(nextMonthYM); }}
+              className="w-full bg-[#1a1a1a] text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors">
+              Got it — show me next steps →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Onboarding step 2: next payday pill tooltip ── */}
+      {onboardingStep === 2 && (
+        <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOnboardingStep(0)}>
+          <div className="absolute top-[90px] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm pointer-events-none">
+            <div className="bg-[#1a1a1a] text-white rounded-2xl p-5 shadow-2xl pointer-events-auto" onClick={e => e.stopPropagation()}>
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Next payday</div>
+              <p className="text-sm leading-relaxed mb-3">
+                Your next payday is in <strong>{daysUntilNextPayday} days</strong>. Tap{' '}
+                <strong>{monthShort(nextMonthYM)}</strong> in the timeline above to plan it — confirm your income and bills are still right, then allocate your leftover money to savings and investments.
+              </p>
+              <button onClick={() => setOnboardingStep(0)} className="w-full border border-white/20 text-white py-2 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+                Let&apos;s go
+              </button>
+            </div>
+            <div className="w-3 h-3 bg-[#1a1a1a] rotate-45 absolute -top-1.5 left-1/2 -translate-x-1/2" />
+          </div>
+        </div>
+      )}
+
       <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div><div className="text-xs text-gray-400">{hh.name}</div><div className="font-semibold text-sm">Payday</div></div>
@@ -135,8 +194,8 @@ export default function PaydayHome() {
             const sess = sessions.find(s => s.date.startsWith(ym));
             const locked = !!sess?.locked_at; const draft = !!sess && !sess.locked_at; const selected = ym === selectedMonth;
             return (
-              <button key={ym} onClick={() => setSelectedMonth(ym)}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border transition-colors ${selected ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'}`}>
+              <button key={ym} onClick={() => { setSelectedMonth(ym); if (onboardingStep === 2) setOnboardingStep(0); }}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border transition-colors ${onboardingStep === 2 && ym === nextMonthYM ? 'ring-2 ring-[#1a1a1a] ring-offset-2' : ''} ${selected ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${locked ? 'bg-emerald-400' : draft ? 'bg-amber-400' : editableMonths.includes(ym) ? 'bg-blue-300' : selected ? 'bg-gray-400' : 'bg-gray-300'}`} />
                 {monthShort(ym)}
               </button>

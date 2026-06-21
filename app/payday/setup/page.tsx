@@ -43,6 +43,7 @@ const DEFAULT_SHORT_TERM: Omit<PotDraft, 'owner'>[] = [];
 const DEFAULT_LONG_TERM: Omit<PotDraft, 'owner'>[] = [];
 
 function uid() { return Math.random().toString(36).slice(2); }
+const fmtGBP = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
 
 const STEPS: Step[] = ['household','joint_bills','personal_bills','debts','lifestyle','short_term','long_term'];
 const STEP_LABELS: Record<Step, string> = {
@@ -235,7 +236,7 @@ export default function SetupPage() {
         })
       ));
 
-      router.push('/payday/session');
+      router.push('/payday?onboarding=1');
     } catch (e) {
       console.error(e);
       alert('Something went wrong. Please try again.');
@@ -385,16 +386,16 @@ export default function SetupPage() {
               <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm space-y-1">
                 <div className="flex justify-between text-gray-500">
                   <span>Total joint bills</span>
-                  <span className="font-medium text-gray-900">£{totalJointBills.toFixed(0)}</span>
+                  <span className="font-medium text-gray-900">{fmtGBP(totalJointBills)}</span>
                 </div>
                 <div className="flex justify-between text-gray-400 text-xs">
                   <span>{nameA || 'Person A'} pays ({splitA}%)</span>
-                  <span>£{(totalJointBills * parseInt(splitA) / 100).toFixed(0)}</span>
+                  <span>{fmtGBP(totalJointBills * parseInt(splitA) / 100)}</span>
                 </div>
                 {isPartner && (
                   <div className="flex justify-between text-gray-400 text-xs">
                     <span>{nameB || 'Person B'} pays ({splitB}%)</span>
-                    <span>£{(totalJointBills * splitB / 100).toFixed(0)}</span>
+                    <span>{fmtGBP(totalJointBills * splitB / 100)}</span>
                   </div>
                 )}
               </div>
