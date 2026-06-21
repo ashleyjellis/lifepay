@@ -109,6 +109,18 @@ export default function PaydayHome() {
     if (res.ok) setSessions((await res.json() as SessionSummary[]).sort((a, b) => b.date.localeCompare(a.date)));
   }, []);
 
+  // Latest locked session detail — used to pre-populate future months (must be before early return)
+  const [latestLockedDetail, setLatestLockedDetail] = useState<SessionDetail | null>(null);
+  const latestLockedSession = sessions.filter(s => s.locked_at).sort((a,b) => b.date.localeCompare(a.date))[0];
+  useEffect(() => {
+    if (latestLockedSession) {
+      fetch(`/api/payday/sessions?id=${latestLockedSession.id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setLatestLockedDetail(d));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestLockedSession?.id]);
+
   if (loading || !household) return <div className="flex items-center justify-center min-h-screen bg-[#faf9f7]"><div className="text-gray-400 text-sm">Loading...</div></div>;
 
   const hh = household;
@@ -129,17 +141,6 @@ export default function PaydayHome() {
   const isLocked = !!selectedSession?.locked_at;
   const isDraft = !!selectedSession && !selectedSession.locked_at;
   const isEditable = editableMonths.includes(selectedMonth) && !isLocked;
-  // Pre-populate future months from latest locked session (separate from current detail)
-  const latestLockedSession = sessions.filter(s => s.locked_at).sort((a,b) => b.date.localeCompare(a.date))[0];
-  const [latestLockedDetail, setLatestLockedDetail] = useState<SessionDetail | null>(null);
-  useEffect(() => {
-    if (latestLockedSession) {
-      fetch(`/api/payday/sessions?id=${latestLockedSession.id}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(d => setLatestLockedDetail(d));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestLockedSession?.id]);
 
   return (
     <div className="min-h-screen bg-[#faf9f7]">
