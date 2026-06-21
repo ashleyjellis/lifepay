@@ -543,16 +543,27 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
     else if (savedId) { setSaved(true); setTimeout(()=>setSaved(false),2000); onSaved(savedId); }
   }
 
-  // Keep a ref to persist so unmount cleanup always has the latest closure
+  // Always keep persistRef pointing at the latest persist closure
   const persistRef = useRef(persist);
   useEffect(() => { persistRef.current = persist; });
-  // Auto-save as draft when switching away (component unmounts)
+
+  // Track whether there's anything worth saving (updated every render via ref)
+  const hasDataRef = useRef(false);
+  useEffect(() => { hasDataRef.current = !!(iA || iB || jointBills.length || billsA.length || billsB.length); });
+
+  // Debounced auto-save — fires 1.5s after the user stops changing anything
+  const debounceRef = useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(() => {
-    return () => {
-      const p = persistRef.current;
-      // Only save if there's something worth saving
-      if (sessionId) { p(false); }
-    };
+    if (!hasDataRef.current) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { persistRef.current(false); }, 1500);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomeA, incomeB, jointBills, extras, billsA, billsB, debtsA, debtsB, spendingA, spendingB, travelA, travelB, percentsA, percentsB]);
+
+  // Immediate save on unmount (e.g. switching months) — persistRef has latest closure
+  useEffect(() => {
+    return () => { if (hasDataRef.current) persistRef.current(false); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
