@@ -2,6 +2,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Quicksand } from 'next/font/google';
+
+const quicksand = Quicksand({ subsets: ['latin'], weight: ['500', '600', '700'] });
 
 interface Household {
   id: string; name: string; mode: 'solo' | 'partner';
@@ -130,7 +133,7 @@ export default function PaydayHome() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestLockedSession?.id]);
 
-  if (loading || !household) return <div className="flex items-center justify-center min-h-screen bg-[#faf9f7]"><div className="text-gray-400 text-sm">Loading...</div></div>;
+  if (loading || !household) return <div className={`flex items-center justify-center min-h-screen bg-[#f7faf8] ${quicksand.className}`}><div className="text-[#414940] text-sm font-medium">Loading...</div></div>;
 
   const hh = household;
   const isPartner = hh.mode === 'partner';
@@ -152,23 +155,23 @@ export default function PaydayHome() {
   const isEditable = editableMonths.includes(selectedMonth) && !isLocked;
 
   return (
-    <div className="min-h-screen bg-[#faf9f7]">
+    <div className={`min-h-screen bg-[#f7faf8] ${quicksand.className}`}>
 
       {/* ── Onboarding step 1: Congratulations modal ── */}
       {onboardingStep === 1 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-[0_2px_20px_rgba(57,105,64,0.18)] text-center">
             <div className="text-4xl mb-4">🎉</div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Your baseline is set up!</h2>
-            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            <h2 className="text-xl font-bold text-[#181c1c] mb-2">Your baseline is set up!</h2>
+            <p className="text-sm text-[#414940] leading-relaxed mb-6">
               This is your Payday baseline — it captures your income, bills, spending, and savings goals. Each month you&apos;ll lock in your actual payday to confirm everything still tracks and allocate any leftover money to your savings and investments.
             </p>
-            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            <p className="text-sm text-[#414940] leading-relaxed mb-6">
               You can update your baseline any time from the <strong>Setup</strong> section in the menu.
             </p>
             <button
               onClick={() => { setOnboardingStep(2); setSelectedMonth(nextMonthYM); }}
-              className="w-full bg-[#1a1a1a] text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors">
+              className="w-full bg-[#396940] text-white py-3 rounded-full font-semibold hover:bg-[#2d5533] transition-colors">
               Got it — show me next steps →
             </button>
           </div>
@@ -179,28 +182,28 @@ export default function PaydayHome() {
       {onboardingStep === 2 && (
         <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOnboardingStep(0)}>
           <div className="absolute top-[90px] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm pointer-events-none">
-            <div className="bg-[#1a1a1a] text-white rounded-2xl p-5 shadow-2xl pointer-events-auto" onClick={e => e.stopPropagation()}>
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Next payday</div>
+            <div className="bg-[#396940] text-white rounded-2xl p-5 shadow-2xl pointer-events-auto" onClick={e => e.stopPropagation()}>
+              <div className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-1">Next payday</div>
               <p className="text-sm leading-relaxed mb-3">
                 Your next payday is in <strong>{daysUntilNextPayday} days</strong>. Tap{' '}
                 <strong>{monthShort(nextMonthYM)}</strong> in the timeline above to plan it — confirm your income and bills are still right, then allocate your leftover money to savings and investments.
               </p>
-              <button onClick={() => setOnboardingStep(0)} className="w-full border border-white/20 text-white py-2 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+              <button onClick={() => setOnboardingStep(0)} className="w-full border border-white/30 text-white py-2 rounded-full text-sm font-semibold hover:bg-white/10 transition-colors">
                 Let&apos;s go
               </button>
             </div>
-            <div className="w-3 h-3 bg-[#1a1a1a] rotate-45 absolute -top-1.5 left-1/2 -translate-x-1/2" />
+            <div className="w-3 h-3 bg-[#396940] rotate-45 absolute -top-1.5 left-1/2 -translate-x-1/2" />
           </div>
         </div>
       )}
 
-      <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-[#c1c9be] bg-white/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div><div className="text-xs text-gray-400">{hh.name}</div><div className="font-semibold text-sm">Payday</div></div>
+          <div><div className="text-xs text-[#717970] font-medium">{hh.name}</div><div className="font-bold text-sm text-[#181c1c]">Payday</div></div>
           <div className="flex gap-3 items-center">
-            <Link href="/payday/history" className="text-xs text-gray-400 hover:text-gray-600">History</Link>
-            <Link href="/payday/setup" className="text-xs text-gray-400 hover:text-gray-600">Setup</Link>
-            <button onClick={async () => { await fetch('/api/payday/auth/logout', { method: 'POST' }); router.push('/payday/login'); }} className="text-xs text-gray-400 hover:text-gray-600">Sign out</button>
+            <Link href="/payday/history" className="text-xs text-[#717970] hover:text-[#396940] font-medium transition-colors">History</Link>
+            <Link href="/payday/setup" className="text-xs text-[#717970] hover:text-[#396940] font-medium transition-colors">Setup</Link>
+            <button onClick={async () => { await fetch('/api/payday/auth/logout', { method: 'POST' }); router.push('/payday/login'); }} className="text-xs text-[#717970] hover:text-[#396940] font-medium transition-colors">Sign out</button>
           </div>
         </div>
       </header>
@@ -213,8 +216,8 @@ export default function PaydayHome() {
             const locked = !!sess?.locked_at; const draft = !!sess && !sess.locked_at; const selected = ym === selectedMonth;
             return (
               <button key={ym} onClick={() => { setSelectedMonth(ym); if (onboardingStep === 2) setOnboardingStep(0); }}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border transition-colors ${onboardingStep === 2 && ym === nextMonthYM ? 'ring-2 ring-[#1a1a1a] ring-offset-2' : ''} ${selected ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${locked ? 'bg-emerald-400' : draft ? 'bg-amber-400' : editableMonths.includes(ym) ? 'bg-blue-300' : selected ? 'bg-gray-400' : 'bg-gray-300'}`} />
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold border transition-colors ${onboardingStep === 2 && ym === nextMonthYM ? 'ring-2 ring-[#396940] ring-offset-2' : ''} ${selected ? 'bg-[#396940] text-white border-[#396940]' : 'bg-white border-[#c1c9be] text-[#414940] hover:border-[#7bae7f]'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${locked ? 'bg-[#7bae7f]' : draft ? 'bg-[#f4a261]' : editableMonths.includes(ym) ? 'bg-[#e9c46a]' : selected ? 'bg-white/60' : 'bg-[#c1c9be]'}`} />
                 {monthShort(ym)}
               </button>
             );
@@ -225,14 +228,14 @@ export default function PaydayHome() {
           {/* Month heading */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xl font-bold text-gray-900">{monthLabel(selectedMonth)}</div>
-              <div className={`text-xs mt-0.5 font-medium ${isLocked ? 'text-emerald-600' : isDraft ? 'text-amber-600' : isEditable ? 'text-blue-500' : 'text-gray-400'}`}>
+              <div className="text-xl font-bold text-[#181c1c]">{monthLabel(selectedMonth)}</div>
+              <div className={`text-xs mt-0.5 font-semibold ${isLocked ? 'text-[#396940]' : isDraft ? 'text-[#8e4e14]' : isEditable ? 'text-[#765a05]' : 'text-[#717970]'}`}>
                 {isLocked ? '● Locked in' : isDraft ? '● In progress' : isEditable ? '● Plan ahead' : 'No payday recorded'}
               </div>
             </div>
           </div>
 
-          {detailLoading && <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>}
+          {detailLoading && <div className="text-center py-12 text-[#717970] text-sm font-medium">Loading...</div>}
 
           {/* Locked session — read-only dashboard */}
           {isLocked && !detailLoading && detail && <LockedDashboard hh={hh} pots={pots} detail={detail} sessionId={selectedSession!.id} />}
@@ -261,7 +264,7 @@ export default function PaydayHome() {
 
           {/* Empty past month */}
           {!selectedSession && !isEditable && !detailLoading && (
-            <div className="text-center py-16 text-gray-400"><div className="text-3xl mb-3">📅</div><p className="text-sm">No payday recorded for this month.</p></div>
+            <div className="text-center py-16 text-[#717970]"><div className="text-3xl mb-3">📅</div><p className="text-sm font-medium">No payday recorded for this month.</p></div>
           )}
         </div>
       </div>
@@ -300,12 +303,12 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
 
   return (
     <>
-      <div className="bg-[#1a1a1a] text-white rounded-2xl p-5">
+      <div className="bg-gradient-to-br from-[#396940] to-[#4a8a52] text-white rounded-[20px] p-5 shadow-[0_2px_20px_rgba(57,105,64,0.18)]">
         <div className="flex gap-4">
-          <div className="flex-1 text-center"><div className="text-xs text-gray-400 mb-0.5">{hh.person_a_name}</div><div className="text-lg font-semibold">{fmt(Number(sess.income_a))}</div></div>
-          {isPartner && <><div className="w-px bg-white/10" /><div className="flex-1 text-center"><div className="text-xs text-gray-400 mb-0.5">{hh.person_b_name}</div><div className="text-lg font-semibold">{fmt(Number(sess.income_b))}</div></div></>}
-          <div className="w-px bg-white/10" />
-          <div className="flex-1 text-center"><div className="text-xs text-gray-400 mb-0.5">Total in</div><div className="text-lg font-semibold">{fmt(Number(sess.income_a)+Number(sess.income_b))}</div></div>
+          <div className="flex-1 text-center"><div className="text-xs text-white/70 mb-0.5 font-medium">{hh.person_a_name}</div><div className="text-lg font-bold">{fmt(Number(sess.income_a))}</div></div>
+          {isPartner && <><div className="w-px bg-white/20" /><div className="flex-1 text-center"><div className="text-xs text-white/70 mb-0.5 font-medium">{hh.person_b_name}</div><div className="text-lg font-bold">{fmt(Number(sess.income_b))}</div></div></>}
+          <div className="w-px bg-white/20" />
+          <div className="flex-1 text-center"><div className="text-xs text-white/70 mb-0.5 font-medium">Total in</div><div className="text-lg font-bold">{fmt(Number(sess.income_a)+Number(sess.income_b))}</div></div>
         </div>
       </div>
       <DSection title="Joint account" icon="🏦" subtitle={isPartner?"Transfer your share in — covers all shared bills":"Household bills for the month"}>
@@ -326,17 +329,17 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
           {isPartner&&potAllocsB.length>0 && <SavingsCard name={hh.person_b_name} allocs={potAllocsB} potMap={potMap} total={totalSavingsB} available={availableB} />}
         </div>
       )}
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
-        <div className="text-sm font-semibold text-gray-700 mb-3">Month at a glance</div>
+      <div className="bg-white rounded-[20px] p-5 space-y-3 shadow-[0_2px_20px_rgba(57,105,64,0.08)]">
+        <div className="text-sm font-bold text-[#181c1c] mb-3">Month at a glance</div>
         <Recap label="Total income" value={fmt(Number(sess.income_a)+Number(sess.income_b))} />
         <Recap label="Joint outgoings" value={fmt(jointFixedTotal+jointExtras.reduce((s,b)=>s+Number(b.amount),0))} negative />
         <Recap label={`${hh.person_a_name}'s personal`} value={fmt(personalTotalA)} negative />
         {isPartner && <Recap label={`${hh.person_b_name}'s personal`} value={fmt(personalTotalB)} negative />}
         <Recap label="Saved / invested" value={fmt(totalSavingsA+totalSavingsB)} positive />
-        <div className="border-t border-gray-100 pt-3"><Recap label="Savings rate" value={`${Math.round(((totalSavingsA+totalSavingsB)/(Number(sess.income_a)+Number(sess.income_b)))*100)}%`} positive bold /></div>
+        <div className="border-t border-[#c1c9be] pt-3"><Recap label="Savings rate" value={`${Math.round(((totalSavingsA+totalSavingsB)/(Number(sess.income_a)+Number(sess.income_b)))*100)}%`} positive bold /></div>
       </div>
       <div className="pb-4">
-        <Link href={`/payday/dashboard/${sessionId}`} className="block border border-gray-200 py-3 rounded-xl text-sm font-medium text-center hover:border-gray-400 transition-colors">Open full dashboard →</Link>
+        <Link href={`/payday/dashboard/${sessionId}`} className="block border border-[#c1c9be] py-3 rounded-full text-sm font-semibold text-[#396940] text-center hover:border-[#7bae7f] hover:bg-[#f1f4f2] transition-colors">Open full dashboard →</Link>
       </div>
     </>
   );
@@ -356,7 +359,7 @@ function EInput({ label, value, onChange, dark }: { label: string; value: string
       <div className="relative">
         <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400`}>£</span>
         <input type="number" min="0" value={value} onChange={e=>onChange(e.target.value)} placeholder="0"
-          className={`w-full pl-7 pr-2 py-2 text-sm rounded-xl focus:outline-none focus:ring-2 ${dark?'bg-white/10 border border-white/20 text-white focus:ring-white/30':'border border-gray-200 bg-white focus:ring-gray-900'}`} />
+          className={`w-full pl-7 pr-2 py-2 text-sm rounded-xl focus:outline-none focus:ring-2 ${dark?'bg-white/10 border border-white/20 text-white focus:ring-white/30':'border border-[#c1c9be] bg-white focus:ring-[#7bae7f]'}`} />
       </div>
     </div>
   );
@@ -364,21 +367,21 @@ function EInput({ label, value, onChange, dark }: { label: string; value: string
 
 function EditBillRow({ bill, onChange, onRemove }: { bill: EditBill; onChange: (f: 'name'|'amount', v: string) => void; onRemove: () => void }) {
   return (
-    <div className="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0">
+    <div className="flex items-center gap-2 py-2 border-b border-[#c1c9be] last:border-0">
       <input value={bill.name} onChange={e=>onChange('name',e.target.value)} placeholder="Name"
-        className="flex-1 text-sm text-gray-700 bg-transparent border-0 focus:outline-none focus:bg-gray-50 rounded px-1 -mx-1" />
+        className="flex-1 text-sm text-[#181c1c] bg-transparent border-0 focus:outline-none focus:bg-[#f1f4f2] rounded-[12px] px-1 -mx-1" />
       <div className="relative w-28 shrink-0">
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">£</span>
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs">£</span>
         <input type="number" min="0" value={bill.amount} onChange={e=>onChange('amount',e.target.value)} placeholder="0"
-          className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-right" />
+          className="w-full pl-6 pr-2 py-1.5 text-sm border border-[#c1c9be] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right" />
       </div>
-      <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none w-5">×</button>
+      <button onClick={onRemove} className="text-[#c1c9be] hover:text-[#ba1a1a] text-lg leading-none w-5">×</button>
     </div>
   );
 }
 
 function AddBtn({ label, onClick }: { label: string; onClick: () => void }) {
-  return <button onClick={onClick} className="w-full border border-dashed border-gray-200 py-2 rounded-xl text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors mt-1">{label}</button>;
+  return <button onClick={onClick} className="w-full border border-dashed border-[#c1c9be] py-2 rounded-xl text-xs text-[#717970] hover:border-[#7bae7f] hover:text-[#396940] transition-colors mt-1">{label}</button>;
 }
 
 function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (owner: 'person_a'|'person_b', potType: 'short_term'|'long_term', name: string) => Promise<void> }) {
@@ -386,18 +389,18 @@ function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (o
   const [name, setName] = useState('');
   const [type, setType] = useState<'short_term'|'long_term'>('short_term');
   const [adding, setAdding] = useState(false);
-  if (!open) return <button onClick={()=>setOpen(true)} className="w-full border border-dashed border-gray-200 py-2 rounded-xl text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors mt-1">+ Add savings / investment pot</button>;
+  if (!open) return <button onClick={()=>setOpen(true)} className="w-full border border-dashed border-[#c1c9be] py-2 rounded-xl text-xs text-[#717970] hover:border-[#7bae7f] hover:text-[#396940] transition-colors mt-1">+ Add savings / investment pot</button>;
   return (
-    <div className="mt-1 border border-gray-200 rounded-xl p-3 space-y-2">
-      <input value={name} onChange={e=>setName(e.target.value)} placeholder="Pot name (e.g. ISA, Holiday)" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900" />
+    <div className="mt-1 border border-[#c1c9be] rounded-xl p-3 space-y-2">
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="Pot name (e.g. ISA, Holiday)" className="w-full text-sm border border-[#c1c9be] rounded-[12px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#7bae7f]" />
       <div className="flex gap-2">
         {(['short_term','long_term'] as const).map(t=>(
-          <button key={t} onClick={()=>setType(t)} className={`flex-1 text-xs py-1.5 rounded-lg border transition-colors ${type===t?'bg-[#1a1a1a] text-white border-[#1a1a1a]':'border-gray-200 text-gray-500'}`}>{t==='short_term'?'Short-term':'Long-term'}</button>
+          <button key={t} onClick={()=>setType(t)} className={`flex-1 text-xs py-1.5 rounded-full border transition-colors font-semibold ${type===t?'bg-[#396940] text-white border-[#396940]':'border-[#c1c9be] text-[#414940]'}`}>{t==='short_term'?'Short-term':'Long-term'}</button>
         ))}
       </div>
       <div className="flex gap-2">
-        <button onClick={async()=>{if(!name.trim())return;setAdding(true);await onAdd(owner,type,name.trim());setName('');setOpen(false);setAdding(false);}} disabled={!name.trim()||adding} className="flex-1 text-xs bg-[#1a1a1a] text-white py-1.5 rounded-lg disabled:opacity-40">{adding?'Adding…':'Add pot'}</button>
-        <button onClick={()=>setOpen(false)} className="text-xs text-gray-400 px-3 py-1.5 rounded-lg border border-gray-200">Cancel</button>
+        <button onClick={async()=>{if(!name.trim())return;setAdding(true);await onAdd(owner,type,name.trim());setName('');setOpen(false);setAdding(false);}} disabled={!name.trim()||adding} className="flex-1 text-xs bg-[#396940] text-white py-1.5 rounded-full disabled:opacity-40 font-semibold">{adding?'Adding…':'Add pot'}</button>
+        <button onClick={()=>setOpen(false)} className="text-xs text-[#717970] px-3 py-1.5 rounded-full border border-[#c1c9be]">Cancel</button>
       </div>
     </div>
   );
@@ -602,15 +605,15 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   return (
     <div className="space-y-6">
       {/* Income */}
-      <div className="bg-[#1a1a1a] text-white rounded-2xl p-5">
-        <div className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-3">Income this month</div>
+      <div className="bg-gradient-to-br from-[#396940] to-[#4a8a52] text-white rounded-[20px] p-5 shadow-[0_2px_20px_rgba(57,105,64,0.18)]">
+        <div className="text-xs text-white/70 uppercase tracking-wide font-semibold mb-3">Income this month</div>
         <div className="flex gap-3">
           <EInput label={hh.person_a_name} value={incomeA} onChange={setIncomeA} dark />
           {isPartner && <EInput label={hh.person_b_name} value={incomeB} onChange={setIncomeB} dark />}
         </div>
         {(iA>0||iB>0) && (
-          <div className="border-t border-white/10 mt-4 pt-3 text-xs text-gray-400 flex justify-between">
-            <span>Total in</span><span className="font-semibold text-white">{fmt(iA+iB)}</span>
+          <div className="border-t border-white/20 mt-4 pt-3 text-xs text-white/70 flex justify-between">
+            <span className="font-medium">Total in</span><span className="font-bold text-white">{fmt(iA+iB)}</span>
           </div>
         )}
       </div>
