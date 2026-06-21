@@ -11,6 +11,7 @@ interface DebtDraft { id: string; name: string; amount: string; person: 'a' | 'b
 interface PotDraft {
   id: string; name: string; targetAmount: string; targetMonths: string;
   color: string; owner: 'person_a' | 'person_b' | 'joint'; potType: 'short_term' | 'long_term';
+  targetMode?: 'months' | 'date'; targetDate?: string;
 }
 
 const POT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6','#64748b'];
@@ -25,11 +26,7 @@ const DEFAULT_JOINT_BILLS: BillDraft[] = [
   { id: 'b7', name: 'Food & Groceries', amount: '' },
 ];
 
-const DEFAULT_SHORT_TERM: Omit<PotDraft, 'owner'>[] = [
-  { id: 'st1', name: 'Celebrations', targetAmount: '', targetMonths: '12', color: '#ec4899', potType: 'short_term' },
-  { id: 'st2', name: 'Holiday', targetAmount: '', targetMonths: '12', color: '#f59e0b', potType: 'short_term' },
-  { id: 'st3', name: 'Short-term savings', targetAmount: '', targetMonths: '12', color: '#10b981', potType: 'short_term' },
-];
+const DEFAULT_SHORT_TERM: Omit<PotDraft, 'owner'>[] = [];
 // Savings pots are always per-person — no joint savings
 
 const DEFAULT_LONG_TERM: Omit<PotDraft, 'owner'>[] = [
@@ -138,7 +135,7 @@ export default function SetupPage() {
   }
 
   function addShortTermFor(owner: 'person_a' | 'person_b' | 'joint') {
-    setShortTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[p.length % POT_COLORS.length], owner, potType: 'short_term' }]);
+    setShortTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '12', color: POT_COLORS[p.length % POT_COLORS.length], owner, potType: 'short_term', targetMode: 'months' }]);
   }
   function addLongTermFor(owner: 'person_a' | 'person_b' | 'joint') {
     setLongTermPots(p => [...p, { id: uid(), name: '', targetAmount: '', targetMonths: '', color: POT_COLORS[p.length % POT_COLORS.length], owner, potType: 'long_term' }]);
@@ -712,8 +709,32 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
   onUpdate: (f: keyof PotDraft, v: string) => void;
   onRemove: () => void;
 }) {
-  const monthly = pot.targetAmount && pot.targetMonths
-    ? (parseFloat(pot.targetAmount) / parseInt(pot.targetMonths)).toFixed(0)
+  const mode = pot.targetMode ?? 'months';
+
+  // Calculate months from a target date (YYYY-MM format)
+  function monthsUntilDate(ym: string): number {
+    const now = new Date();
+    const [y, m] = ym.split('-').map(Number);
+    return Math.max(1, (y - now.getFullYear()) * 12 + (m - now.getMonth()));
+  }
+
+  // Generate payday month options: current month through 5 years ahead
+  function paydayOptions() {
+    const now = new Date(); const opts = [];
+    for (let i = 1; i <= 60; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const label = d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+      opts.push({ val, label });
+    }
+    return opts;
+  }
+
+  const months = mode === 'date' && pot.targetDate
+    ? monthsUntilDate(pot.targetDate)
+    : parseInt(pot.targetMonths) || 0;
+  const monthly = pot.targetAmount && months > 0
+    ? (parseFloat(pot.targetAmount) / months).toFixed(0)
     : null;
 
   return (
@@ -729,33 +750,50 @@ function ShortTermPotRow({ pot, onUpdate, onRemove }: {
         <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none px-1">×</button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-gray-400 mb-1 block">Target amount</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
-            <input type="number" min="0"
-              className="w-full pl-7 pr-2 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
-              placeholder="e.g. 2000"
-              value={pot.targetAmount}
-              onChange={e => onUpdate('targetAmount', e.target.value)}
-            />
-          </div>
+      <div>
+        <label className="text-xs text-gray-400 mb-1 block">Target amount</label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
+          <input type="number" min="0"
+            className="w-full pl-7 pr-2 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
+            placeholder="e.g. 2000"
+            value={pot.targetAmount}
+            onChange={e => onUpdate('targetAmount', e.target.value)}
+          />
         </div>
-        <div>
-          <label className="text-xs text-gray-400 mb-1 block">Over how many months?</label>
+      </div>
+
+      <div>
+        <div className="flex rounded-xl border border-gray-200 overflow-hidden mb-2">
+          <button onClick={() => onUpdate('targetMode', 'months')}
+            className={`flex-1 text-xs py-2 font-medium transition-colors ${mode === 'months' ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            Blend over months
+          </button>
+          <button onClick={() => onUpdate('targetMode', 'date')}
+            className={`flex-1 text-xs py-2 font-medium transition-colors ${mode === 'date' ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            By payday date
+          </button>
+        </div>
+        {mode === 'months' ? (
           <input type="number" min="1" max="60"
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
             placeholder="e.g. 12"
             value={pot.targetMonths}
             onChange={e => onUpdate('targetMonths', e.target.value)}
           />
-        </div>
+        ) : (
+          <select value={pot.targetDate ?? ''}
+            onChange={e => onUpdate('targetDate', e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
+            <option value="">Select target payday…</option>
+            {paydayOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
+          </select>
+        )}
       </div>
 
       {monthly && (
         <div className="text-xs text-emerald-600 font-medium">
-          → Save £{monthly}/month to reach your goal
+          → Save £{monthly}/month{mode === 'date' && pot.targetDate ? ` over ${months} months` : ''}
         </div>
       )}
     </div>
