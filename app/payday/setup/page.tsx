@@ -81,11 +81,11 @@ const STEP_LABELS: Record<Step, string> = {
 
 function AmountInput({ value, onChange, placeholder = '0' }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div className="relative w-28">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
+    <div className="relative w-32">
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9aaa98] text-sm font-semibold">£</span>
       <input
         type="number" min="0"
-        className="w-full pl-7 pr-2 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+        className="w-full pl-8 pr-3 py-3 text-sm rounded-2xl bg-[#f0f0eb] border-0 focus:outline-none focus:ring-2 focus:ring-[#7bae7f] font-semibold text-[#2a2a2a]"
         placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -94,11 +94,52 @@ function AmountInput({ value, onChange, placeholder = '0' }: { value: string; on
   );
 }
 
-function NavButtons({ onBack, onNext, nextLabel = 'Next →' }: { onBack: () => void; onNext: () => void; nextLabel?: string }) {
+function WizardNextBtn({ onClick, label, disabled }: { onClick: () => void; label?: string; disabled?: boolean }) {
   return (
-    <div className="flex gap-3 pt-2">
-      <button onClick={onBack} className="flex-1 border border-gray-200 py-3.5 rounded-xl text-sm font-medium hover:border-gray-400 transition-colors">← Back</button>
-      <button onClick={onNext} className="flex-1 bg-[#1a1a1a] text-white py-3.5 rounded-xl font-medium hover:bg-gray-800 transition-colors">{nextLabel}</button>
+    <button onClick={onClick} disabled={disabled}
+      className="w-full bg-[#396940] text-white py-4 rounded-full font-semibold text-sm hover:bg-[#2d5533] transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+      {label ?? 'Next'} <span className="text-base">→</span>
+    </button>
+  );
+}
+
+function WizardBackBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full text-[#9aaa98] text-sm hover:text-[#414940] transition-colors py-2">
+      ← Back
+    </button>
+  );
+}
+
+function NavButtons({ onBack, onNext, nextLabel = 'Next' }: { onBack: () => void; onNext: () => void; nextLabel?: string }) {
+  return (
+    <div className="space-y-2 pt-2">
+      <WizardNextBtn onClick={onNext} label={nextLabel} />
+      <WizardBackBtn onClick={onBack} />
+    </div>
+  );
+}
+
+function WizardInput({ value, onChange, placeholder, type = 'text' }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+  return (
+    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      className="w-full bg-[#f0f0eb] border-0 rounded-2xl px-4 py-4 text-sm text-[#2a2a2a] font-medium placeholder-[#b0bab0] focus:outline-none focus:ring-2 focus:ring-[#7bae7f]" />
+  );
+}
+
+function WizardLabel({ children }: { children: React.ReactNode }) {
+  return <label className="block text-sm font-semibold text-[#414940] mb-2">{children}</label>;
+}
+
+function WizardInfoBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 bg-[#eef3ef] rounded-2xl px-4 py-4 text-sm text-[#4a6b4a]">
+      <span className="shrink-0 mt-0.5 text-[#7bae7f]">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </span>
+      <span>{children}</span>
     </div>
   );
 }
@@ -110,18 +151,18 @@ function PersonBillSection({ name, bills, onAdd, onUpdate, onRemove }: {
   onRemove: (id: string) => void;
 }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
-      <div className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">{name}</div>
-      {bills.length === 0 && <p className="text-xs text-gray-400">No personal bills added yet.</p>}
+    <div className="bg-[#f7faf8] rounded-2xl p-4 space-y-3">
+      <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest pb-1">{name}</div>
+      {bills.length === 0 && <p className="text-xs text-[#9aaa98] italic">No personal bills added yet.</p>}
       {bills.map(b => (
-        <div key={b.id} className="flex gap-2">
-          <input className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+        <div key={b.id} className="flex gap-2 items-center">
+          <input className="flex-1 bg-white rounded-2xl px-4 py-3 text-sm text-[#2a2a2a] font-medium placeholder-[#b0bab0] border-0 focus:outline-none focus:ring-2 focus:ring-[#7bae7f]"
             placeholder="e.g. Phone, Gym, Netflix" value={b.name} onChange={e => onUpdate(b.id, 'name', e.target.value)} />
           <AmountInput value={b.amount} onChange={v => onUpdate(b.id, 'amount', v)} />
-          <button onClick={() => onRemove(b.id)} className="text-gray-300 hover:text-red-400 px-1 text-lg leading-none">×</button>
+          <button onClick={() => onRemove(b.id)} className="text-[#c1c9be] hover:text-[#ba1a1a] text-lg leading-none shrink-0">×</button>
         </div>
       ))}
-      <button onClick={onAdd} className="text-xs text-gray-400 hover:text-gray-700 font-medium">+ Add bill</button>
+      <button onClick={onAdd} className="text-sm text-[#396940] font-semibold hover:underline">+ Add bill</button>
     </div>
   );
 }
@@ -133,18 +174,18 @@ function DebtSection({ name, debts, onAdd, onUpdate, onRemove }: {
   onRemove: (id: string) => void;
 }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
-      <div className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">{name}</div>
-      {debts.length === 0 && <p className="text-xs text-gray-400">No debt repayments — leave blank if none.</p>}
+    <div className="bg-[#f7faf8] rounded-2xl p-4 space-y-3">
+      <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest pb-1">{name}</div>
+      {debts.length === 0 && <p className="text-xs text-[#9aaa98] italic">No debt repayments — skip if none.</p>}
       {debts.map(d => (
-        <div key={d.id} className="flex gap-2">
-          <input className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+        <div key={d.id} className="flex gap-2 items-center">
+          <input className="flex-1 bg-white rounded-2xl px-4 py-3 text-sm text-[#2a2a2a] font-medium placeholder-[#b0bab0] border-0 focus:outline-none focus:ring-2 focus:ring-[#7bae7f]"
             placeholder="e.g. Barclaycard, Car loan" value={d.name} onChange={e => onUpdate(d.id, 'name', e.target.value)} />
           <AmountInput value={d.amount} onChange={v => onUpdate(d.id, 'amount', v)} />
-          <button onClick={() => onRemove(d.id)} className="text-gray-300 hover:text-red-400 px-1 text-lg leading-none">×</button>
+          <button onClick={() => onRemove(d.id)} className="text-[#c1c9be] hover:text-[#ba1a1a] text-lg leading-none shrink-0">×</button>
         </div>
       ))}
-      <button onClick={onAdd} className="text-xs text-gray-400 hover:text-gray-700 font-medium">+ Add repayment</button>
+      <button onClick={onAdd} className="text-sm text-[#396940] font-semibold hover:underline">+ Add repayment</button>
     </div>
   );
 }
@@ -154,19 +195,19 @@ function LifestylePersonBlock({ name, spending, onSpending, transport, onTranspo
   transport: string; onTransport: (v: string) => void;
 }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
-      <div className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">{name}</div>
+    <div className="bg-[#f7faf8] rounded-2xl p-4 space-y-4">
+      <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest">{name}</div>
       <div className="flex items-center gap-3">
         <div className="flex-1">
-          <div className="text-sm text-gray-600 mb-1">Spending money</div>
-          <div className="text-xs text-gray-400">Monthly pocket money for personal spending</div>
+          <div className="text-sm font-semibold text-[#2a2a2a]">Spending money</div>
+          <div className="text-xs text-[#9aaa98] mt-0.5">Monthly pocket money for personal spending</div>
         </div>
         <AmountInput value={spending} onChange={onSpending} />
       </div>
       <div className="flex items-center gap-3">
         <div className="flex-1">
-          <div className="text-sm text-gray-600 mb-1">Travel / Transport</div>
-          <div className="text-xs text-gray-400">Commuting and regular transport costs</div>
+          <div className="text-sm font-semibold text-[#2a2a2a]">Travel / Transport</div>
+          <div className="text-xs text-[#9aaa98] mt-0.5">Commuting and regular transport costs</div>
         </div>
         <AmountInput value={transport} onChange={onTransport} />
       </div>
@@ -982,43 +1023,64 @@ function OnboardingWizard() {
 
   const totalJointBills = jointBills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
 
+  const STEP_TITLES: Record<Step, string> = {
+    household: "Let's get to know your household.",
+    joint_bills: isPartner ? 'Your joint bills.' : 'Your household bills.',
+    personal_bills: 'Personal bills.',
+    debts: 'Any debt repayments?',
+    lifestyle: 'Your lifestyle costs.',
+    short_term: 'Short-term savings goals.',
+    long_term: 'Long-term savings & investments.',
+  };
+  const STEP_SUBTITLES: Record<Step, string> = {
+    household: "We'll use this to help you organise your finances together.",
+    joint_bills: isPartner ? 'Shared costs — mortgage, utilities, food. Split by your agreed ratio.' : 'Your regular household costs — mortgage, utilities, food.',
+    personal_bills: isPartner ? "Each person's own recurring costs — phone, gym, subscriptions." : 'Your own recurring costs — phone, gym, subscriptions.',
+    debts: 'Credit cards, loans, regular debt payments. Skip if none.',
+    lifestyle: 'Monthly spending money and travel costs per person.',
+    short_term: 'Holidays, celebrations, big purchases — goals with a target date or amount.',
+    long_term: 'ISAs, investment platforms, pensions — accounts you contribute to each month.',
+  };
+
+  const WizardAddBtn = ({ label, onClick }: { label: string; onClick: () => void }) => (
+    <button onClick={onClick} className="w-full border-2 border-dashed border-[#c8d5c8] rounded-2xl py-3 text-sm text-[#7bae7f] font-semibold hover:border-[#7bae7f] hover:bg-[#f0f7f0] transition-colors">
+      {label}
+    </button>
+  );
+
   return (
-    <div className="min-h-screen flex flex-col items-center py-10 px-4 bg-[#faf9f7]">
-      <div className="w-full max-w-lg">
-        <Link href="/payday" className="text-sm text-gray-400 hover:text-gray-600 mb-6 inline-block">← Payday</Link>
+    <div className={`min-h-screen bg-[#f2f2ec] ${quicksand.className}`}>
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-8 py-5">
+        <div className="text-[#396940] font-bold text-xl tracking-tight">Payd</div>
+        <div className="text-sm text-[#9aaa98] font-medium">Step {stepIndex + 1} of {STEPS.length}</div>
+      </div>
 
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{STEP_LABELS[step]}</span>
-          <span className="text-xs text-gray-400">{stepIndex + 1} / {STEPS.length}</span>
-        </div>
+      {/* Card */}
+      <div className="flex justify-center px-4 pb-12">
+        <div className="w-full max-w-xl bg-white rounded-3xl shadow-[0_4px_40px_rgba(0,0,0,0.08)] p-8 md:p-10 space-y-6">
 
-        <div className="flex gap-1 mb-8">
-          {STEPS.map((s, i) => (
-            <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${i <= stepIndex ? 'bg-[#1a1a1a]' : 'bg-gray-200'}`} />
-          ))}
-        </div>
+          {/* Heading */}
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1a1a1a] leading-tight">{STEP_TITLES[step]}</h1>
+            <p className="text-sm text-[#9aaa98]">{STEP_SUBTITLES[step]}</p>
+          </div>
 
-        {step === 'household' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">Set up your household</h1>
-              <p className="text-gray-500 text-sm">Takes a couple of minutes. You only do this once.</p>
-            </div>
-
+          {/* ── Household ── */}
+          {step === 'household' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5">Household name</label>
-                <input className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                  placeholder="e.g. The Smiths" value={hhName} onChange={e => setHhName(e.target.value)} />
+                <WizardLabel>Household name</WizardLabel>
+                <WizardInput value={hhName} onChange={setHhName} placeholder="e.g. The Sunshine Home" />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5">Household type</label>
+                <WizardLabel>Who are we managing for?</WizardLabel>
                 <div className="grid grid-cols-2 gap-3">
                   {(['solo','partner'] as Mode[]).map(m => (
                     <button key={m} onClick={() => setMode(m)}
-                      className={`py-3 px-4 rounded-xl border text-sm font-medium transition-colors ${mode === m ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white'}`}>
-                      {m === 'solo' ? '🧍 Solo' : '👫 Partners'}
+                      className={`py-4 px-4 rounded-2xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${mode === m ? 'bg-[#7bae7f] text-white' : 'bg-[#f0f0eb] text-[#5a6b5a] hover:bg-[#e4ece4]'}`}>
+                      <span>{m === 'solo' ? '🧍' : '👫'}</span> {m === 'solo' ? 'Solo' : 'Partners'}
                     </button>
                   ))}
                 </div>
@@ -1026,226 +1088,180 @@ function OnboardingWizard() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">{mode === 'solo' ? 'Your name' : 'Partner A name'}</label>
-                  <input className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                    placeholder={mode === 'solo' ? 'Your name' : 'e.g. Ashley'} value={nameA} onChange={e => setNameA(e.target.value)} />
+                  <WizardLabel>{mode === 'solo' ? 'Your name' : 'Partner A name'}</WizardLabel>
+                  <WizardInput value={nameA} onChange={setNameA} placeholder={mode === 'solo' ? 'Your name' : 'e.g. Ashley'} />
                 </div>
                 {isPartner && (
                   <div>
-                    <label className="block text-sm font-medium mb-1.5">Partner B name</label>
-                    <input className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                      placeholder="e.g. Sam" value={nameB} onChange={e => setNameB(e.target.value)} />
+                    <WizardLabel>Partner B name</WizardLabel>
+                    <WizardInput value={nameB} onChange={setNameB} placeholder="e.g. Sam" />
                   </div>
                 )}
               </div>
 
               {isPartner && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-0.5">Joint bill split</label>
-                    <p className="text-xs text-gray-400 mb-3">How are shared bills divided between you?</p>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-500 mb-1">{nameA || 'Person A'}</div>
-                        <input type="range" min="0" max="100" value={splitA} onChange={e => setSplitA(e.target.value)} className="w-full accent-gray-900" />
-                      </div>
-                      <div className="text-center shrink-0 w-16">
-                        <div className="text-lg font-bold">{splitA}%</div>
-                        <div className="text-xs text-gray-400">{splitB}%</div>
-                        <div className="text-xs text-gray-400">{nameB || 'B'}</div>
-                      </div>
-                    </div>
-                    {splitA === '50' && <p className="text-xs text-gray-400 mt-2">Split evenly 50/50</p>}
+                <div className="space-y-3">
+                  <WizardLabel>Joint bill split</WizardLabel>
+                  <div className="flex items-center gap-4">
+                    <input type="range" min="0" max="100" value={splitA} onChange={e => setSplitA(e.target.value)} className="flex-1 accent-[#7bae7f]" />
+                    <div className="text-lg font-bold text-[#396940] shrink-0 w-16 text-center">{splitA} / {splitB}</div>
                   </div>
+                  <div className="flex justify-between text-xs text-[#9aaa98]">
+                    <span>{nameA || 'Person A'} pays less</span>
+                    <span>Equal split</span>
+                    <span>{nameA || 'Person A'} pays more</span>
+                  </div>
+                  <WizardInfoBox>Don&apos;t worry! You can adjust these percentages for specific bills later. This is just a friendly starting point.</WizardInfoBox>
                 </div>
               )}
-            </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-5">
-              <label className="block text-sm font-medium mb-0.5">Payday date</label>
-              <p className="text-xs text-gray-400 mb-3">Which day of the month does your salary land?</p>
-              <div className="flex items-center gap-3">
-                <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
-                  className="w-24 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white text-center font-semibold" />
-                <span className="text-sm text-gray-500">of each month</span>
+              <div className="space-y-2">
+                <WizardLabel>Payday date</WizardLabel>
+                <div className="flex items-center gap-3">
+                  <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
+                    className="w-24 bg-[#f0f0eb] border-0 rounded-2xl px-4 py-4 text-center text-sm font-bold text-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#7bae7f]" />
+                  <span className="text-sm text-[#9aaa98]">of each month</span>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">Next month&apos;s payday becomes editable 2 weeks before this date.</p>
+
+              <WizardNextBtn onClick={next} label="That's a great start. Next, let's look at bills" />
             </div>
+          )}
 
-            <button onClick={next} className="w-full bg-[#1a1a1a] text-white py-3.5 rounded-xl font-medium hover:bg-gray-800 transition-colors">
-              Next: Joint Bills →
-            </button>
-          </div>
-        )}
+          {/* ── Joint Bills ── */}
+          {step === 'joint_bills' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                {jointBills.map(b => (
+                  <div key={b.id} className="flex gap-2 items-center">
+                    <input className="flex-1 bg-[#f0f0eb] rounded-2xl px-4 py-3 text-sm text-[#2a2a2a] font-medium placeholder-[#b0bab0] border-0 focus:outline-none focus:ring-2 focus:ring-[#7bae7f]"
+                      placeholder="Bill name" value={b.name} onChange={e => updateBill(jointBills, setJointBills, b.id, 'name', e.target.value)} />
+                    <AmountInput value={b.amount} onChange={v => updateBill(jointBills, setJointBills, b.id, 'amount', v)} />
+                    <button onClick={() => removeBill(jointBills, setJointBills, b.id)} className="text-[#c1c9be] hover:text-[#ba1a1a] text-lg leading-none shrink-0">×</button>
+                  </div>
+                ))}
+              </div>
 
-        {step === 'joint_bills' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">{isPartner ? 'Your Joint Bills' : 'Your Household Bills'}</h1>
-              <p className="text-gray-500 text-sm">{isPartner ? 'Costs you share as a household — mortgage, utilities, food. These load automatically each payday and are split by your agreed ratio.' : 'Your regular household costs — mortgage, utilities, food. These load automatically each payday for you to confirm.'}</p>
-            </div>
+              <button onClick={() => addBill(jointBills, setJointBills)} className="w-full border-2 border-dashed border-[#c8d5c8] rounded-2xl py-3 text-sm text-[#7bae7f] font-semibold hover:border-[#7bae7f] hover:bg-[#f0f7f0] transition-colors">+ Add bill</button>
 
-            <div className="space-y-2">
-              {jointBills.map(b => (
-                <div key={b.id} className="flex gap-2 items-center">
-                  <input className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                    placeholder="Bill name" value={b.name} onChange={e => updateBill(jointBills, setJointBills, b.id, 'name', e.target.value)} />
-                  <AmountInput value={b.amount} onChange={v => updateBill(jointBills, setJointBills, b.id, 'amount', v)} />
-                  <button onClick={() => removeBill(jointBills, setJointBills, b.id)} className="text-gray-300 hover:text-red-400 px-1 text-lg leading-none">×</button>
-                </div>
-              ))}
-            </div>
-
-            <button onClick={() => addBill(jointBills, setJointBills)} className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">+ Add bill</button>
-
-            {totalJointBills > 0 && isPartner && (
-              <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm space-y-1">
-                <div className="flex justify-between text-gray-500">
-                  <span>Total joint bills</span>
-                  <span className="font-medium text-gray-900">{fmtGBP(totalJointBills)}</span>
-                </div>
-                <div className="flex justify-between text-gray-400 text-xs">
-                  <span>{nameA || 'Person A'} pays ({splitA}%)</span>
-                  <span>{fmtGBP(totalJointBills * parseInt(splitA) / 100)}</span>
-                </div>
-                {isPartner && (
-                  <div className="flex justify-between text-gray-400 text-xs">
+              {totalJointBills > 0 && isPartner && (
+                <div className="bg-[#f0f7f0] rounded-2xl px-4 py-4 text-sm space-y-1.5">
+                  <div className="flex justify-between text-[#414940] font-semibold">
+                    <span>Total joint bills</span>
+                    <span>{fmtGBP(totalJointBills)}</span>
+                  </div>
+                  <div className="flex justify-between text-[#9aaa98] text-xs">
+                    <span>{nameA || 'Person A'} pays ({splitA}%)</span>
+                    <span>{fmtGBP(totalJointBills * parseInt(splitA) / 100)}</span>
+                  </div>
+                  <div className="flex justify-between text-[#9aaa98] text-xs">
                     <span>{nameB || 'Person B'} pays ({splitB}%)</span>
                     <span>{fmtGBP(totalJointBills * splitB / 100)}</span>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            <NavButtons onBack={prev} onNext={next} />
-          </div>
-        )}
-
-        {step === 'personal_bills' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">Personal Bills</h1>
-              <p className="text-gray-500 text-sm">{isPartner ? "Each person's own recurring costs — phone contracts, gym memberships, subscriptions. These come out of each person's own share." : "Your own recurring personal costs — phone, gym, subscriptions."}</p>
+              <NavButtons onBack={prev} onNext={next} nextLabel="Next" />
             </div>
-            <PersonBillSection name={nameA || 'Person A'} bills={billsA} onAdd={() => addBill(billsA, setBillsA)} onUpdate={(id, f, v) => updateBill(billsA, setBillsA, id, f, v)} onRemove={id => removeBill(billsA, setBillsA, id)} />
-            {isPartner && <PersonBillSection name={nameB || 'Person B'} bills={billsB} onAdd={() => addBill(billsB, setBillsB)} onUpdate={(id, f, v) => updateBill(billsB, setBillsB, id, f, v)} onRemove={id => removeBill(billsB, setBillsB, id)} />}
-            <NavButtons onBack={prev} onNext={next} />
-          </div>
-        )}
+          )}
 
-        {step === 'debts' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">Debt Repayments</h1>
-              <p className="text-gray-500 text-sm">Credit cards, loans, or any regular debt payments. These come out of each person&apos;s own money each month. Leave blank if none.</p>
+          {/* ── Personal Bills ── */}
+          {step === 'personal_bills' && (
+            <div className="space-y-4">
+              <PersonBillSection name={nameA || 'Person A'} bills={billsA} onAdd={() => addBill(billsA, setBillsA)} onUpdate={(id, f, v) => updateBill(billsA, setBillsA, id, f, v)} onRemove={id => removeBill(billsA, setBillsA, id)} />
+              {isPartner && <PersonBillSection name={nameB || 'Person B'} bills={billsB} onAdd={() => addBill(billsB, setBillsB)} onUpdate={(id, f, v) => updateBill(billsB, setBillsB, id, f, v)} onRemove={id => removeBill(billsB, setBillsB, id)} />}
+              <NavButtons onBack={prev} onNext={next} nextLabel="Next" />
             </div>
-            <DebtSection name={nameA || 'Person A'} debts={debtsA} onAdd={() => addDebt('a')} onUpdate={(id, f, v) => updateDebt('a', id, f, v)} onRemove={id => removeDebt('a', id)} />
-            {isPartner && <DebtSection name={nameB || 'Person B'} debts={debtsB} onAdd={() => addDebt('b')} onUpdate={(id, f, v) => updateDebt('b', id, f, v)} onRemove={id => removeDebt('b', id)} />}
-            <NavButtons onBack={prev} onNext={next} nextLabel="Next: Lifestyle →" />
-          </div>
-        )}
+          )}
 
-        {step === 'lifestyle' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">Lifestyle</h1>
-              <p className="text-gray-500 text-sm">Monthly spending money and travel costs, per person. These are the amounts each person sets aside for themselves every payday.</p>
+          {/* ── Debts ── */}
+          {step === 'debts' && (
+            <div className="space-y-4">
+              <DebtSection name={nameA || 'Person A'} debts={debtsA} onAdd={() => addDebt('a')} onUpdate={(id, f, v) => updateDebt('a', id, f, v)} onRemove={id => removeDebt('a', id)} />
+              {isPartner && <DebtSection name={nameB || 'Person B'} debts={debtsB} onAdd={() => addDebt('b')} onUpdate={(id, f, v) => updateDebt('b', id, f, v)} onRemove={id => removeDebt('b', id)} />}
+              <NavButtons onBack={prev} onNext={next} nextLabel="Next" />
             </div>
+          )}
+
+          {/* ── Lifestyle ── */}
+          {step === 'lifestyle' && (
             <div className="space-y-4">
               <LifestylePersonBlock name={nameA || 'Person A'} spending={spendingA} onSpending={setSpendingA} transport={transportA} onTransport={setTransportA} />
               {isPartner && <LifestylePersonBlock name={nameB || 'Person B'} spending={spendingB} onSpending={setSpendingB} transport={transportB} onTransport={setTransportB} />}
+              <NavButtons onBack={prev} onNext={next} nextLabel="Next" />
             </div>
-            <NavButtons onBack={prev} onNext={next} nextLabel="Next: Short-term Savings →" />
-          </div>
-        )}
+          )}
 
-        {step === 'short_term' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">Short-term Savings Goals</h1>
-              <p className="text-gray-500 text-sm">Life events and near-future expenses — holidays, celebrations, big purchases.</p>
+          {/* ── Short-term Savings ── */}
+          {step === 'short_term' && (
+            <div className="space-y-4">
+              {isPartner ? (
+                <>
+                  <div className="space-y-3">
+                    <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest">{nameA || 'Person A'}</div>
+                    {shortTermPots.filter(p => p.owner === 'person_a').map(pot => <ShortTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(shortTermPots, setShortTermPots, pot.id, p)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                    <WizardAddBtn label={`+ Add goal for ${nameA || 'Person A'}`} onClick={() => addShortTermFor('person_a')} />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest">{nameB || 'Person B'}</div>
+                    {shortTermPots.filter(p => p.owner === 'person_b').map(pot => <ShortTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(shortTermPots, setShortTermPots, pot.id, p)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                    <WizardAddBtn label={`+ Add goal for ${nameB || 'Person B'}`} onClick={() => addShortTermFor('person_b')} />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest">Joint</div>
+                    {shortTermPots.filter(p => p.owner === 'joint').map(pot => <ShortTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(shortTermPots, setShortTermPots, pot.id, p)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                    <WizardAddBtn label="+ Add joint goal" onClick={() => addShortTermFor('joint')} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {shortTermPots.map(pot => <ShortTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(shortTermPots, setShortTermPots, pot.id, p)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                  <WizardAddBtn label="+ Add savings goal" onClick={() => addShortTermFor('person_a')} />
+                </>
+              )}
+              <NavButtons onBack={prev} onNext={next} nextLabel="Next" />
             </div>
-            {isPartner ? (
-              <>
-                <div className="space-y-3">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameA || 'Person A'}</div>
-                  {shortTermPots.filter(p => p.owner === 'person_a').map(pot => (
-                    <ShortTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
-                  ))}
-                  <button onClick={() => addShortTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add goal for {nameA || 'Person A'}</button>
-                </div>
-                <div className="space-y-3">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameB || 'Person B'}</div>
-                  {shortTermPots.filter(p => p.owner === 'person_b').map(pot => (
-                    <ShortTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
-                  ))}
-                  <button onClick={() => addShortTermFor('person_b')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add goal for {nameB || 'Person B'}</button>
-                </div>
-                <div className="space-y-3">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Joint</div>
-                  {shortTermPots.filter(p => p.owner === 'joint').map(pot => (
-                    <ShortTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
-                  ))}
-                  <button onClick={() => addShortTermFor('joint')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add joint goal</button>
-                </div>
-              </>
-            ) : (
-              <>
-                {shortTermPots.map(pot => (
-                  <ShortTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(shortTermPots, setShortTermPots, pot.id, patch)} onRemove={() => setShortTermPots(p => p.filter(x => x.id !== pot.id))} />
-                ))}
-                <button onClick={() => addShortTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add savings goal</button>
-              </>
-            )}
-            <NavButtons onBack={prev} onNext={next} nextLabel="Next: Long-term Savings →" />
-          </div>
-        )}
+          )}
 
-        {step === 'long_term' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">Long-term Savings & Investments</h1>
-              <p className="text-gray-500 text-sm">Accounts and platforms you contribute to each month — ISAs, investment apps, pensions. Add each one you want to allocate to on payday.</p>
+          {/* ── Long-term Savings ── */}
+          {step === 'long_term' && (
+            <div className="space-y-4">
+              {isPartner ? (
+                <>
+                  <div className="space-y-3">
+                    <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest">{nameA || 'Person A'}</div>
+                    {longTermPots.filter(p => p.owner === 'person_a').map(pot => <LongTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(longTermPots, setLongTermPots, pot.id, p)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                    <WizardAddBtn label={`+ Add account for ${nameA || 'Person A'}`} onClick={() => addLongTermFor('person_a')} />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest">{nameB || 'Person B'}</div>
+                    {longTermPots.filter(p => p.owner === 'person_b').map(pot => <LongTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(longTermPots, setLongTermPots, pot.id, p)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                    <WizardAddBtn label={`+ Add account for ${nameB || 'Person B'}`} onClick={() => addLongTermFor('person_b')} />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="text-xs font-bold text-[#7bae7f] uppercase tracking-widest">Joint</div>
+                    {longTermPots.filter(p => p.owner === 'joint').map(pot => <LongTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(longTermPots, setLongTermPots, pot.id, p)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                    <WizardAddBtn label="+ Add joint account" onClick={() => addLongTermFor('joint')} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {longTermPots.map(pot => <LongTermPotRow key={pot.id} pot={pot} onUpdate={p => updatePot(longTermPots, setLongTermPots, pot.id, p)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />)}
+                  <WizardAddBtn label="+ Add account / platform" onClick={() => addLongTermFor('person_a')} />
+                </>
+              )}
+              <div className="space-y-2 pt-2">
+                <WizardNextBtn onClick={finish} label={saving ? 'Setting up…' : "All done — let's go 🎉"} disabled={saving} />
+                <WizardBackBtn onClick={prev} />
+              </div>
             </div>
-            {isPartner ? (
-              <>
-                <div className="space-y-3">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameA || 'Person A'}</div>
-                  {longTermPots.filter(p => p.owner === 'person_a').map(pot => (
-                    <LongTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
-                  ))}
-                  <button onClick={() => addLongTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account for {nameA || 'Person A'}</button>
-                </div>
-                <div className="space-y-3">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{nameB || 'Person B'}</div>
-                  {longTermPots.filter(p => p.owner === 'person_b').map(pot => (
-                    <LongTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
-                  ))}
-                  <button onClick={() => addLongTermFor('person_b')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account for {nameB || 'Person B'}</button>
-                </div>
-                <div className="space-y-3">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Joint</div>
-                  {longTermPots.filter(p => p.owner === 'joint').map(pot => (
-                    <LongTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
-                  ))}
-                  <button onClick={() => addLongTermFor('joint')} className="w-full border border-dashed border-gray-300 py-2 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add joint account</button>
-                </div>
-              </>
-            ) : (
-              <>
-                {longTermPots.map(pot => (
-                  <LongTermPotRow key={pot.id} pot={pot} onUpdate={(patch) => updatePot(longTermPots, setLongTermPots, pot.id, patch)} onRemove={() => setLongTermPots(p => p.filter(x => x.id !== pot.id))} />
-                ))}
-                <button onClick={() => addLongTermFor('person_a')} className="w-full border border-dashed border-gray-300 py-2.5 rounded-xl text-sm text-gray-500 hover:border-gray-400">+ Add account / platform</button>
-              </>
-            )}
-            <button onClick={finish} disabled={saving} className="w-full bg-[#1a1a1a] text-white py-3.5 rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-60">
-              {saving ? 'Setting up...' : "Let's go 🎉"}
-            </button>
-            <button onClick={prev} className="w-full border border-gray-200 py-3 rounded-xl text-sm font-medium hover:border-gray-400 transition-colors">← Back</button>
-          </div>
-        )}
+          )}
+
+        </div>
       </div>
+
+      {/* Footer */}
+      <div className="text-center text-xs text-[#b0bab0] pb-8">© 2026 Payd Financial Wellness</div>
     </div>
   );
 }
