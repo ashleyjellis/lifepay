@@ -817,6 +817,7 @@ function LongTermPotRow({ pot, onUpdate, onRemove }: {
   onRemove: () => void;
 }) {
   const [nameEdited, setNameEdited] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   function autoName(provider: string, accountType: AccountType): string {
     const labels: Record<AccountType, string> = { savings_account: 'Savings', cash_isa: 'Cash ISA', stocks_isa: 'S&S ISA', lisa: 'LISA', pension: 'Pension', other: '' };
@@ -838,6 +839,24 @@ function LongTermPotRow({ pot, onUpdate, onRemove }: {
   }
 
   const selectedType = ACCOUNT_TYPES.find(t => t.value === (pot.accountType ?? 'savings_account'))!;
+  const monthly = pot.targetAmount ? parseFloat(pot.targetAmount) : null;
+
+  if (collapsed && pot.name) {
+    return (
+      <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3">
+        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: pot.color }} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-800 truncate">{pot.name}</div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium" style={{ background: pot.color }}>{selectedType.label}</span>
+            {monthly && monthly > 0 && <span className="text-xs text-gray-400">· £{monthly.toFixed(0)}/mo</span>}
+          </div>
+        </div>
+        <button onClick={() => setCollapsed(false)} className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-2 py-1">Edit</button>
+        <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none">×</button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
@@ -891,6 +910,12 @@ function LongTermPotRow({ pot, onUpdate, onRemove }: {
           />
         </div>
       </div>
+
+      {pot.name && (
+        <button onClick={() => setCollapsed(true)} className="w-full border border-gray-200 py-2 rounded-xl text-xs font-medium text-gray-500 hover:border-gray-400 transition-colors">
+          Done ✓
+        </button>
+      )}
     </div>
   );
 }

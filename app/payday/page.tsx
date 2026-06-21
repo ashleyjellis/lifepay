@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -245,6 +245,7 @@ export default function PaydayHome() {
               existingId={selectedSession?.id ?? null}
               detail={isDraft ? detail : null}
               latestLockedDetail={(!selectedSession && selectedMonth !== curYM) ? latestLockedDetail : null}
+              mostRecentSession={!selectedSession ? ([...sessions].sort((a,b) => b.date.localeCompare(a.date))[0] ?? null) : null}
               householdBills={householdBills}
               householdDebts={householdDebts}
               month={selectedMonth}
@@ -404,11 +405,12 @@ function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (o
 
 // ── Inline editable session ─────────────────────────────────────────────────
 
-function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail, householdBills, householdDebts, month, onSaved, onLocked, onPotsChanged }: {
+function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail, mostRecentSession, householdBills, householdDebts, month, onSaved, onLocked, onPotsChanged }: {
   hh: Household; pots: Pot[];
   existingId: string | null;
   detail: SessionDetail | null;
   latestLockedDetail: SessionDetail | null;
+  mostRecentSession: SessionSummary | null;
   householdBills: {id:string;name:string;amount:number;category:string}[];
   householdDebts: {id:string;name:string;amount:number;person:string}[];
   month: string;
@@ -438,8 +440,14 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const [percentsB, setPercentsB] = useState<Record<string,string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
+    // Only initialize form state once on mount — subsequent detail changes (after save+reload)
+    // should not reset the user's in-progress edits
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     const pa: Record<string,string> = {}; const pb: Record<string,string> = {};
     pots.forEach(p => { pa[p.id] = ''; pb[p.id] = ''; });
 
@@ -496,7 +504,11 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
         if (dAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dAvA*100));});
         if (dAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dAvB*100));});
       } else {
-        // Truly fresh — pre-fill from household setup data
+        // Truly fresh — pre-fill from household setup data + most recent session income
+        if (mostRecentSession) {
+          setIncomeA(mostRecentSession.income_a > 0 ? String(mostRecentSession.income_a) : '');
+          setIncomeB(mostRecentSession.income_b > 0 ? String(mostRecentSession.income_b) : '');
+        }
         setSpendingA(hh.default_spending_a > 0 ? String(hh.default_spending_a) : '');
         setSpendingB(hh.default_spending_b > 0 ? String(hh.default_spending_b) : '');
         setTravelA(hh.default_transport_a > 0 ? String(hh.default_transport_a) : '');
