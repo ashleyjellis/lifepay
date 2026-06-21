@@ -31,11 +31,12 @@ export async function POST(req: Request) {
   const db = getDb();
   const id = randomUUID();
   await db.execute({
-    sql: 'INSERT INTO savings_pots (id, household_id, name, target_amount, target_months, color, owner, pot_type, sort_order, account_type, provider) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+    sql: 'INSERT INTO savings_pots (id, household_id, name, target_amount, target_months, target_date, color, owner, pot_type, sort_order, account_type, provider) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
     args: [
       id, body.householdId, body.name,
       body.targetAmount ?? null,
       body.targetMonths ?? null,
+      body.targetDate ?? null,
       body.color ?? '#6366f1',
       body.owner ?? 'joint',
       body.potType ?? 'short_term',
@@ -58,8 +59,8 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   await db.execute({
-    sql: 'UPDATE savings_pots SET name=?, target_amount=?, target_months=?, color=?, owner=?, pot_type=?, sort_order=?, account_type=?, provider=? WHERE id=?',
-    args: [body.name, body.targetAmount ?? null, body.targetMonths ?? null, body.color, body.owner ?? 'joint', body.potType ?? 'short_term', body.sortOrder ?? 0, body.accountType ?? null, body.provider ?? null, body.id],
+    sql: 'UPDATE savings_pots SET name=?, target_amount=?, target_months=?, target_date=?, color=?, owner=?, pot_type=?, sort_order=?, account_type=?, provider=? WHERE id=?',
+    args: [body.name, body.targetAmount ?? null, body.targetMonths ?? null, body.targetDate ?? null, body.color, body.owner ?? 'joint', body.potType ?? 'short_term', body.sortOrder ?? 0, body.accountType ?? null, body.provider ?? null, body.id],
   });
   return NextResponse.json({ ok: true });
 }

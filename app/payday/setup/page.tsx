@@ -535,8 +535,8 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
         setDebtsB(debts.filter(d=>d.person==='b').map(d=>({ localId: uid(), dbId: d.id, name: d.name, amount: String(d.amount), person: 'b' as const })));
       }
       if (pRes.ok) {
-        const pots: {id:string;name:string;target_amount:number|null;target_months:number|null;color:string;owner:string;pot_type:string;account_type:string|null;provider:string|null}[] = await pRes.json();
-        setShortPots(pots.filter(p=>p.pot_type==='short_term').map(p=>({ localId: uid(), dbId: p.id, name: p.name, targetAmount: p.target_amount ? String(p.target_amount) : '', targetMonths: p.target_months ? String(p.target_months) : '', color: p.color, owner: p.owner as 'person_a'|'person_b'|'joint', potType: 'short_term' as const, accountType: (p.account_type as AccountType|null) ?? undefined, provider: p.provider ?? '' })));
+        const pots: {id:string;name:string;target_amount:number|null;target_months:number|null;target_date:string|null;color:string;owner:string;pot_type:string;account_type:string|null;provider:string|null}[] = await pRes.json();
+        setShortPots(pots.filter(p=>p.pot_type==='short_term').map(p=>({ localId: uid(), dbId: p.id, name: p.name, targetAmount: p.target_amount ? String(p.target_amount) : '', targetMonths: p.target_months ? String(p.target_months) : '', targetMode: p.target_date ? 'date' : 'months', targetDate: p.target_date ?? undefined, color: p.color, owner: p.owner as 'person_a'|'person_b'|'joint', potType: 'short_term' as const, accountType: (p.account_type as AccountType|null) ?? undefined, provider: p.provider ?? '' })));
         setLongPots(pots.filter(p=>p.pot_type==='long_term').map(p=>({ localId: uid(), dbId: p.id, name: p.name, targetAmount: p.target_amount ? String(p.target_amount) : '', targetMonths: p.target_months ? String(p.target_months) : '', color: p.color, owner: p.owner as 'person_a'|'person_b'|'joint', potType: 'long_term' as const, accountType: (p.account_type as AccountType|null) ?? undefined, provider: p.provider ?? '' })));
       }
     }
@@ -645,10 +645,10 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
     const toCreate = pots.filter(p => !p.dbId && !p.deleted && p.name);
     await Promise.all([
       ...toDelete.map(p => fetch(`/api/payday/pots?id=${p.dbId}`, { method: 'DELETE' })),
-      ...toUpdate.map(p => fetch('/api/payday/pots', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: p.dbId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), color: p.color, owner: p.owner, potType: p.potType, sortOrder: 0, accountType: p.accountType ?? null, provider: p.provider ?? null }) })),
+      ...toUpdate.map(p => fetch('/api/payday/pots', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: p.dbId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), targetDate: p.targetDate ?? null, color: p.color, owner: p.owner, potType: p.potType, sortOrder: 0, accountType: p.accountType ?? null, provider: p.provider ?? null }) })),
     ]);
     const created = await Promise.all(toCreate.map((p, i) =>
-      fetch('/api/payday/pots', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ householdId: hh.id, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), color: p.color, owner: p.owner, potType, sortOrder: pots.length + i, accountType: p.accountType ?? null, provider: p.provider ?? null }) }).then(r=>r.json())
+      fetch('/api/payday/pots', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ householdId: hh.id, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: effectiveMonths(p), targetDate: p.targetDate ?? null, color: p.color, owner: p.owner, potType, sortOrder: pots.length + i, accountType: p.accountType ?? null, provider: p.provider ?? null }) }).then(r=>r.json())
     ));
     let ci = 0;
     setList(prev => {
