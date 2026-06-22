@@ -724,8 +724,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       const dJointSavB = pots.filter(p=>p.owner==='joint').reduce((s,p)=>s+(parseFloat(ja[p.id])||0)*(splitB/100),0);
       const dPerAvA = dAvA - dJointSavA; const dPerAvB = dAvB - dJointSavB;
       setJointPotAmounts(ja);
-      if (dPerAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvA*100));});
-      if (dPerAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvB*100));});
+      if (dPerAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Number(a.amount)/dPerAvA*100);});
+      if (dPerAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Number(a.amount)/dPerAvB*100);});
     } else {
       const src = latestLockedDetail;
       if (src) {
@@ -755,8 +755,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
         const dJointSavB2 = pots.filter(p=>p.owner==='joint').reduce((s,p)=>s+(parseFloat(ja2[p.id])||0)*(splitB/100),0);
         const dPerAvA2 = dAvA - dJointSavA2; const dPerAvB2 = dAvB - dJointSavB2;
         setJointPotAmounts(ja2);
-        if (dPerAvA2 > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvA2*100));});
-        if (dPerAvB2 > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvB2*100));});
+        if (dPerAvA2 > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Number(a.amount)/dPerAvA2*100);});
+        if (dPerAvB2 > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Number(a.amount)/dPerAvB2*100);});
       } else {
         if (mostRecentSession) {
           setIncomeA(mostRecentSession.income_a > 0 ? String(mostRecentSession.income_a) : '');
@@ -1077,12 +1077,20 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               ))}
             </div>
             <AddPotRow owner="person_a" onAdd={addPot} />
-            {potsPersonA.length > 0 && (
-              <div className={`flex justify-between text-xs mt-3 font-bold ${aReady?'text-[#396940]':'text-[#717970]'}`}>
-                <span>{Math.round(allocPctA)}% allocated</span>
-                <span>{aReady?'✓ All allocated':`${(100-allocPctA).toFixed(0)}% remaining`}</span>
-              </div>
-            )}
+            {potsPersonA.length > 0 && (() => {
+              const ltTotalA = potsPersonA.filter(p=>p.pot_type!=='short_term').reduce((s,p)=>s+potAmountA(p.id),0);
+              const stTotalA = potsPersonA.filter(p=>p.pot_type==='short_term').reduce((s,p)=>s+potAmountA(p.id),0);
+              return (
+                <div className="mt-3 space-y-1.5">
+                  {ltTotalA > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Long-term total</span><span className="font-semibold">{fmt(ltTotalA)}/mo</span></div>}
+                  {stTotalA > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Short-term total</span><span className="font-semibold">{fmt(stTotalA)}/mo</span></div>}
+                  <div className={`flex justify-between text-xs font-bold pt-1 border-t border-[#ebeeed] ${aReady?'text-[#396940]':'text-[#717970]'}`}>
+                    <span>{Math.round(allocPctA)}% allocated</span>
+                    <span>{aReady?'✓ All allocated':`${(100-allocPctA).toFixed(0)}% remaining`}</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {isPartner && (
@@ -1108,12 +1116,20 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 ))}
               </div>
               <AddPotRow owner="person_b" onAdd={addPot} />
-              {potsPersonB.length > 0 && (
-                <div className={`flex justify-between text-xs mt-3 font-bold ${bReady?'text-[#396940]':'text-[#717970]'}`}>
-                  <span>{Math.round(allocPctB)}% allocated</span>
-                  <span>{bReady?'✓ All allocated':`${(100-allocPctB).toFixed(0)}% remaining`}</span>
-                </div>
-              )}
+              {potsPersonB.length > 0 && (() => {
+                const ltTotalB = potsPersonB.filter(p=>p.pot_type!=='short_term').reduce((s,p)=>s+potAmountB(p.id),0);
+                const stTotalB = potsPersonB.filter(p=>p.pot_type==='short_term').reduce((s,p)=>s+potAmountB(p.id),0);
+                return (
+                  <div className="mt-3 space-y-1.5">
+                    {ltTotalB > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Long-term total</span><span className="font-semibold">{fmt(ltTotalB)}/mo</span></div>}
+                    {stTotalB > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Short-term total</span><span className="font-semibold">{fmt(stTotalB)}/mo</span></div>}
+                    <div className={`flex justify-between text-xs font-bold pt-1 border-t border-[#ebeeed] ${bReady?'text-[#396940]':'text-[#717970]'}`}>
+                      <span>{Math.round(allocPctB)}% allocated</span>
+                      <span>{bReady?'✓ All allocated':`${(100-allocPctB).toFixed(0)}% remaining`}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -1122,17 +1138,60 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       {/* ── Preview ── */}
       {(iA>0||iB>0) && (
         <div className="bg-white rounded-[20px] p-6 shadow-[0_2px_16px_rgba(57,105,64,0.07)]">
-          <div className="text-base font-bold text-[#181c1c] mb-5">Preview</div>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm"><span className="text-[#414940] font-medium">Total income</span><span className="font-bold text-[#181c1c]">{fmt(iA+iB)}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-[#414940] font-medium">Joint outgoings</span><span className="font-bold text-[#ba1a1a]">−{fmt(totalJointAllExtras)}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-[#414940] font-medium">{hh.person_a_name}&apos;s personal</span><span className="font-bold text-[#ba1a1a]">−{fmt(personalTotalA)}</span></div>
-            {isPartner && <div className="flex justify-between text-sm"><span className="text-[#414940] font-medium">{hh.person_b_name}&apos;s personal</span><span className="font-bold text-[#ba1a1a]">−{fmt(personalTotalB)}</span></div>}
-          </div>
-          {(totalSavingsA+totalSavingsB)>0 && (
-            <div className="flex justify-between items-baseline border-t border-[#ebeeed] mt-5 pt-4">
-              <span className="text-base font-bold text-[#181c1c]">Saving this month</span>
-              <span className="text-2xl font-bold text-[#396940]">{fmt(totalSavingsA+totalSavingsB)}</span>
+          <div className="text-base font-bold text-[#181c1c] mb-4">Preview</div>
+          {isPartner ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-[#9aaa98] font-semibold uppercase tracking-wide">
+                  <th className="text-left pb-3 font-semibold"></th>
+                  <th className="text-right pb-3 font-semibold">Total</th>
+                  <th className="text-right pb-3 font-semibold">{hh.person_a_name}</th>
+                  <th className="text-right pb-3 font-semibold">{hh.person_b_name}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f0f2f0]">
+                <tr>
+                  <td className="py-2.5 text-[#414940] font-medium">Income</td>
+                  <td className="py-2.5 text-right font-bold text-[#181c1c]">{fmt(iA+iB)}</td>
+                  <td className="py-2.5 text-right text-[#414940] font-semibold">{fmt(iA)}</td>
+                  <td className="py-2.5 text-right text-[#414940] font-semibold">{fmt(iB)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 text-[#414940] font-medium">Joint bills</td>
+                  <td className="py-2.5 text-right font-bold text-[#ba1a1a]">−{fmt(totalJointAllExtras)}</td>
+                  <td className="py-2.5 text-right text-[#ba1a1a] font-semibold">−{fmt(jointContribA)}</td>
+                  <td className="py-2.5 text-right text-[#ba1a1a] font-semibold">−{fmt(jointContribB)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 text-[#414940] font-medium">Personal</td>
+                  <td className="py-2.5 text-right font-bold text-[#ba1a1a]">−{fmt(personalTotalA+personalTotalB)}</td>
+                  <td className="py-2.5 text-right text-[#ba1a1a] font-semibold">−{fmt(personalTotalA)}</td>
+                  <td className="py-2.5 text-right text-[#ba1a1a] font-semibold">−{fmt(personalTotalB)}</td>
+                </tr>
+                {(totalSavingsA+totalSavingsB)>0 && (
+                  <tr>
+                    <td className="py-2.5 text-[#414940] font-medium">Savings</td>
+                    <td className="py-2.5 text-right font-bold text-[#396940]">{fmt(totalSavingsA+totalSavingsB)}</td>
+                    <td className="py-2.5 text-right text-[#396940] font-semibold">{fmt(totalSavingsA)}</td>
+                    <td className="py-2.5 text-right text-[#396940] font-semibold">{fmt(totalSavingsB)}</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-[#ebeeed]">
+                  <td className="pt-3 text-sm font-bold text-[#181c1c]">Remaining</td>
+                  <td className="pt-3 text-right text-lg font-bold text-[#181c1c]">{fmt((availableA-totalSavingsA+jointSavForA)+(availableB-totalSavingsB+jointSavForB))}</td>
+                  <td className="pt-3 text-right font-bold text-[#414940]">{fmt(availableA-potsPersonA.reduce((s,p)=>s+potAmountA(p.id),0))}</td>
+                  <td className="pt-3 text-right font-bold text-[#414940]">{fmt(availableB-potsPersonB.reduce((s,p)=>s+potAmountB(p.id),0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm"><span className="text-[#414940] font-medium">Income</span><span className="font-bold text-[#181c1c]">{fmt(iA)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-[#414940] font-medium">Bills</span><span className="font-bold text-[#ba1a1a]">−{fmt(totalJointAllExtras+personalTotalA)}</span></div>
+              {totalSavingsA>0 && <div className="flex justify-between text-sm"><span className="text-[#414940] font-medium">Savings</span><span className="font-bold text-[#396940]">{fmt(totalSavingsA)}</span></div>}
+              <div className="flex justify-between text-sm border-t border-[#ebeeed] pt-3"><span className="text-[#414940] font-bold">Remaining</span><span className="font-bold text-[#181c1c]">{fmt(availableA-potsPersonA.reduce((s,p)=>s+potAmountA(p.id),0))}</span></div>
             </div>
           )}
         </div>
