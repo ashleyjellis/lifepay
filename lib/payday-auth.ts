@@ -58,3 +58,18 @@ export async function getAuthUser(): Promise<{ id: string; email: string } | nul
   if (!token) return null;
   return getUserFromToken(token);
 }
+
+export async function getAdminUser(): Promise<{ id: string; email: string } | null> {
+  const db = getDb();
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const result = await db.execute({
+    sql: `SELECT u.id, u.email FROM users u
+          JOIN auth_sessions s ON s.user_id = u.id
+          WHERE s.token = ? AND s.expires_at > ? AND u.is_admin = 1`,
+    args: [token, new Date().toISOString()],
+  });
+  if (!result.rows[0]) return null;
+  return { id: result.rows[0].id as string, email: result.rows[0].email as string };
+}

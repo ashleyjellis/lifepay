@@ -181,6 +181,7 @@ export async function initSchema() {
     'ALTER TABLE savings_pots ADD COLUMN provider TEXT',
     'ALTER TABLE savings_pots ADD COLUMN current_balance REAL',
     'ALTER TABLE savings_pots ADD COLUMN target_date TEXT',
+    'ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0',
   ];
 
   for (const sql of migrations) {
