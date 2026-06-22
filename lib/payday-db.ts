@@ -151,6 +151,18 @@ export async function initSchema() {
       amount REAL NOT NULL DEFAULT 0,
       FOREIGN KEY (household_id) REFERENCES households(id)
     );
+
+    CREATE TABLE IF NOT EXISTS forecast_year_contributions (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL,
+      year INTEGER NOT NULL,
+      person_a_monthly REAL,
+      person_b_monthly REAL,
+      person_a_bonus REAL,
+      person_b_bonus REAL,
+      UNIQUE(household_id, year),
+      FOREIGN KEY (household_id) REFERENCES households(id)
+    );
   `);
 
   // Migrations — each wrapped so re-runs are safe

@@ -43,6 +43,12 @@ interface ForecastEvent {
   id: string; household_id: string; name: string; year: number; amount: number;
 }
 
+interface YearContribution {
+  id: string; household_id: string; year: number;
+  person_a_monthly: number | null; person_b_monthly: number | null;
+  person_a_bonus: number | null; person_b_bonus: number | null;
+}
+
 interface WealthSnapshot {
   pot_id: string; year: number; month: number; end_balance: number;
 }
@@ -257,25 +263,47 @@ function InvestModal({
 // ── ContributionsModal ────────────────────────────────────────────────────────
 
 function ContributionsModal({
-  open, person, household, settings, sessions, onClose, onSave,
+  open, person, forYear, household, settings, yearOverrides, sessions, forecastYears, onClose, onSave, onSaveYearOverride, onDeleteYearOverride,
 }: {
-  open: boolean; person: 'a' | 'b'; household: Household; settings: ForecastSettings | null;
-  sessions: Session[]; onClose: () => void; onSave: (updated: ForecastSettings) => void;
+  open: boolean; person: 'a' | 'b'; forYear: number | null;
+  household: Household; settings: ForecastSettings | null;
+  yearOverrides: YearContribution[];
+  sessions: Session[]; forecastYears: number[];
+  onClose: () => void;
+  onSave: (updated: ForecastSettings) => void;
+  onSaveYearOverride: (override: YearContribution) => void;
+  onDeleteYearOverride: (year: number) => void;
 }) {
   const [monthly, setMonthly] = useState('');
   const [bonus, setBonus] = useState('');
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    if (person === 'a') {
-      setMonthly(settings?.person_a_monthly != null ? String(settings.person_a_monthly) : '0');
-      setBonus(settings?.person_a_bonus != null ? String(settings.person_a_bonus) : '0');
+    setSelectedYear(forYear);
+    const override = forYear != null ? yearOverrides.find(o => o.year === forYear && (person === 'a' ? o.person_a_monthly != null : o.person_b_monthly != null)) : null;
+    if (override) {
+      setMonthly(person === 'a' ? String(override.person_a_monthly ?? '') : String(override.person_b_monthly ?? ''));
+      setBonus(person === 'a' ? String(override.person_a_bonus ?? '') : String(override.person_b_bonus ?? ''));
     } else {
-      setMonthly(settings?.person_b_monthly != null ? String(settings.person_b_monthly) : '0');
-      setBonus(settings?.person_b_bonus != null ? String(settings.person_b_bonus) : '0');
+      setMonthly(person === 'a' ? String(settings?.person_a_monthly ?? 0) : String(settings?.person_b_monthly ?? 0));
+      setBonus(person === 'a' ? String(settings?.person_a_bonus ?? 0) : String(settings?.person_b_bonus ?? 0));
     }
-  }, [open, person, settings]);
+  }, [open, forYear, person, settings, yearOverrides]);
+
+  // When year selection changes, pre-fill from that year's override or global default
+  function handleYearChange(yr: number | null) {
+    setSelectedYear(yr);
+    const override = yr != null ? yearOverrides.find(o => o.year === yr) : null;
+    if (override) {
+      setMonthly(person === 'a' ? String(override.person_a_monthly ?? settings?.person_a_monthly ?? 0) : String(override.person_b_monthly ?? settings?.person_b_monthly ?? 0));
+      setBonus(person === 'a' ? String(override.person_a_bonus ?? settings?.person_a_bonus ?? 0) : String(override.person_b_bonus ?? settings?.person_b_bonus ?? 0));
+    } else {
+      setMonthly(person === 'a' ? String(settings?.person_a_monthly ?? 0) : String(settings?.person_b_monthly ?? 0));
+      setBonus(person === 'a' ? String(settings?.person_a_bonus ?? 0) : String(settings?.person_b_bonus ?? 0));
+    }
+  }
 
   if (!open) return null;
 
@@ -289,41 +317,96 @@ function ContributionsModal({
   const annualTotal = monthlyVal * 12 + bonusVal;
   const personName = person === 'a' ? household.person_a_name : household.person_b_name;
 
+  const existingOverride = selectedYear != null ? yearOverrides.find(o => o.year === selectedYear) : null;
+
   async function handleSave() {
-    if (!settings) return;
     setSaving(true);
-    const body = {
-      type: 'settings',
-      householdId: household.id,
-      growthRate: settings.growth_rate,
-      personAMonthly: person === 'a' ? monthlyVal : settings.person_a_monthly,
-      personBMonthly: person === 'b' ? monthlyVal : settings.person_b_monthly,
-      personABonus: person === 'a' ? bonusVal : settings.person_a_bonus,
-      personBBonus: person === 'b' ? bonusVal : settings.person_b_bonus,
-      horizon: settings.horizon,
-      startYear: settings.start_year,
-    };
-    const res = await fetch('/api/payday/forecast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      onSave(updated as ForecastSettings);
-      onClose();
+    if (selectedYear != null) {
+      // Save as year-specific override
+      const existOvr = yearOverrides.find(o => o.year === selectedYear);
+      const body = {
+        type: 'year_contribution',
+        householdId: household.id,
+        year: selectedYear,
+        personAMonthly: person === 'a' ? monthlyVal : (existOvr?.person_a_monthly ?? null),
+        personBMonthly: person === 'b' ? monthlyVal : (existOvr?.person_b_monthly ?? null),
+        personABonus: person === 'a' ? bonusVal : (existOvr?.person_a_bonus ?? null),
+        personBBonus: person === 'b' ? bonusVal : (existOvr?.person_b_bonus ?? null),
+      };
+      const res = await fetch('/api/payday/forecast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onSaveYearOverride(updated as YearContribution);
+        onClose();
+      }
+    } else {
+      // Save as global default
+      if (!settings) { setSaving(false); return; }
+      const body = {
+        type: 'settings',
+        householdId: household.id,
+        growthRate: settings.growth_rate,
+        personAMonthly: person === 'a' ? monthlyVal : settings.person_a_monthly,
+        personBMonthly: person === 'b' ? monthlyVal : settings.person_b_monthly,
+        personABonus: person === 'a' ? bonusVal : settings.person_a_bonus,
+        personBBonus: person === 'b' ? bonusVal : settings.person_b_bonus,
+        horizon: settings.horizon,
+        startYear: settings.start_year,
+      };
+      const res = await fetch('/api/payday/forecast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onSave(updated as ForecastSettings);
+        onClose();
+      }
     }
     setSaving(false);
+  }
+
+  async function handleDeleteOverride() {
+    if (selectedYear == null) return;
+    await fetch(`/api/payday/forecast?yearOverride=1&householdId=${household.id}&year=${selectedYear}`, { method: 'DELETE' });
+    onDeleteYearOverride(selectedYear);
+    onClose();
   }
 
   return (
     <div className={MODAL_BACKDROP} onClick={onClose}>
       <div className={MODAL_CARD} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[#1a2b1a]">{personName}&apos;s Contribution Assumptions</h2>
+          <h2 className="text-xl font-bold text-[#1a2b1a]">
+            {selectedYear != null ? `${personName} – ${selectedYear}` : `${personName} – Default`}
+          </h2>
           <button onClick={onClose} className="text-2xl text-[#717970] hover:text-[#1a2b1a] leading-none">×</button>
         </div>
         <div className="space-y-5">
+          {/* Year selector */}
+          <div>
+            <p className={LABEL_CLS}>Apply to year</p>
+            <select
+              value={selectedYear ?? ''}
+              onChange={e => handleYearChange(e.target.value === '' ? null : Number(e.target.value))}
+              className={MINPUT_CLS}
+            >
+              <option value="">Default (all years)</option>
+              {forecastYears.map(y => (
+                <option key={y} value={y}>
+                  {y}{yearOverrides.some(o => o.year === y) ? ' ✦' : ''}
+                </option>
+              ))}
+            </select>
+            {selectedYear == null && (
+              <p className="text-xs text-[#717970] mt-1.5">Sets the baseline for all years without a specific override.</p>
+            )}
+          </div>
           <div>
             <p className={LABEL_CLS}>Monthly savings</p>
             <div className="relative">
@@ -348,8 +431,14 @@ function ContributionsModal({
           </div>
         </div>
         <div className="flex gap-3 mt-7">
-          <button onClick={onClose} className={BTN_SECONDARY + ' flex-1'}>Cancel</button>
-          <button onClick={handleSave} disabled={saving || !settings} className={BTN_PRIMARY + ' flex-1 disabled:opacity-50'}>
+          {existingOverride && selectedYear != null ? (
+            <button onClick={handleDeleteOverride} className="flex-1 border-2 border-[#fca5a5] text-[#ba1a1a] py-3 rounded-full font-semibold hover:bg-[#fee2e2] transition-colors text-sm">
+              Reset to default
+            </button>
+          ) : (
+            <button onClick={onClose} className={BTN_SECONDARY + ' flex-1'}>Cancel</button>
+          )}
+          <button onClick={handleSave} disabled={saving || (!settings && selectedYear == null)} className={BTN_PRIMARY + ' flex-1 disabled:opacity-50'}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
@@ -515,12 +604,13 @@ export default function ForecastPage() {
   const [pots, setPots] = useState<Pot[]>([]);
   const [settings, setSettings] = useState<ForecastSettings | null>(null);
   const [events, setEvents] = useState<ForecastEvent[]>([]);
+  const [yearOverrides, setYearOverrides] = useState<YearContribution[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [annualSnapshots, setAnnualSnapshots] = useState<WealthSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
   // Modal states
-  const [contribModal, setContribModal] = useState<{ open: boolean; person: 'a' | 'b' } | null>(null);
+  const [contribModal, setContribModal] = useState<{ open: boolean; person: 'a' | 'b'; forYear: number | null } | null>(null);
   const [growthModal, setGrowthModal] = useState(false);
   const [addEventModal, setAddEventModal] = useState(false);
   const [investModal, setInvestModal] = useState<{ open: boolean; pot: Pot | null }>({ open: false, pot: null });
@@ -542,12 +632,13 @@ export default function ForecastPage() {
       const h: Household = Array.isArray(hData) ? hData[0] : hData;
       setHousehold(h);
 
+      const currentYear = new Date().getFullYear();
       const [potsRes, forecastRes, sessionsRes, snapsThisRes, snapsPrevRes] = await Promise.all([
         fetch(`/api/payday/pots?householdId=${h.id}`),
         fetch(`/api/payday/forecast?householdId=${h.id}`),
         fetch(`/api/payday/sessions?householdId=${h.id}`),
-        fetch(`/api/payday/growth?householdId=${h.id}&year=${new Date().getFullYear()}&annual=1`),
-        fetch(`/api/payday/growth?householdId=${h.id}&year=${new Date().getFullYear() - 1}&annual=1`),
+        fetch(`/api/payday/growth?householdId=${h.id}&year=${currentYear}&annual=1`),
+        fetch(`/api/payday/growth?householdId=${h.id}&year=${currentYear - 1}&annual=1`),
       ]);
 
       let longTermPots: Pot[] = [];
@@ -564,6 +655,7 @@ export default function ForecastPage() {
         const fd = await forecastRes.json();
         setSettings(fd.settings ?? null);
         setEvents(Array.isArray(fd.events) ? fd.events : []);
+        setYearOverrides(Array.isArray(fd.yearOverrides) ? fd.yearOverrides : []);
       }
 
       if (sessionsRes.ok) {
@@ -594,26 +686,39 @@ export default function ForecastPage() {
   // ── Derived calculations ───────────────────────────────────────────────────
 
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
   const horizon = settings?.horizon ?? 10;
   const forecastYears = Array.from({ length: horizon }, (_, i) => (settings?.start_year ?? currentYear) + i);
   const startingWealth = pots.reduce((s, p) => s + (p.current_balance ?? 0), 0);
 
   const yearData: Array<{
-    startBalance: number; annualA: number; annualB: number; contributions: number;
+    year: number; startBalance: number; annualA: number; annualB: number; contributions: number;
     plannedOut: number; projectedGrowth: number; endBalance: number; yearEvents: ForecastEvent[];
+    hasOverrideA: boolean; hasOverrideB: boolean;
   }> = [];
   let prevEnd = startingWealth;
   for (let i = 0; i < forecastYears.length; i++) {
+    const yr = forecastYears[i];
     const startBalance = i === 0 ? startingWealth : prevEnd;
-    const annualA = ((settings?.person_a_monthly ?? 0) * 12) + (settings?.person_a_bonus ?? 0);
-    const annualB = household?.mode === 'partner' ? ((settings?.person_b_monthly ?? 0) * 12) + (settings?.person_b_bonus ?? 0) : 0;
+    const override = yearOverrides.find(o => o.year === yr);
+    const monthlyA = override?.person_a_monthly ?? settings?.person_a_monthly ?? 0;
+    const bonusA = override?.person_a_bonus ?? settings?.person_a_bonus ?? 0;
+    const monthlyB = override?.person_b_monthly ?? settings?.person_b_monthly ?? 0;
+    const bonusB = override?.person_b_bonus ?? settings?.person_b_bonus ?? 0;
+    const annualA = monthlyA * 12 + bonusA;
+    const annualB = household?.mode === 'partner' ? monthlyB * 12 + bonusB : 0;
     const contributions = annualA + annualB;
-    const yearEvents = events.filter(e => e.year === forecastYears[i]);
+    const yearEvents = events.filter(e => e.year === yr);
     const plannedOut = yearEvents.reduce((s, e) => s + e.amount, 0);
     const projectedGrowth = startBalance * ((settings?.growth_rate ?? 5) / 100);
     const endBalance = startBalance + contributions - plannedOut + projectedGrowth;
     prevEnd = endBalance;
-    yearData.push({ startBalance, annualA, annualB, contributions, plannedOut, projectedGrowth, endBalance, yearEvents });
+    yearData.push({
+      year: yr, startBalance, annualA, annualB, contributions, plannedOut,
+      projectedGrowth, endBalance, yearEvents,
+      hasOverrideA: override?.person_a_monthly != null || override?.person_a_bonus != null,
+      hasOverrideB: override?.person_b_monthly != null || override?.person_b_bonus != null,
+    });
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -689,13 +794,18 @@ export default function ForecastPage() {
 
   const uniqueEventNames = Array.from(new Set(events.map(e => e.name)));
 
-  // ── Past years for actuals ───────────────────────────────────────────────
+  // ── Actuals: include current year if snapshot data exists for it ──────────
 
-  const pastYears = forecastYears.filter(y => y < currentYear);
+  const actualsYears = forecastYears.filter(y => annualSnapshots.some(s => s.year === y));
 
-  // ── Summary bar calcs ────────────────────────────────────────────────────
+  // ── Summary bar calcs (use current year's effective values) ──────────────
 
-  const totalMonthly = (settings?.person_a_monthly ?? 0) + (household?.mode === 'partner' ? (settings?.person_b_monthly ?? 0) : 0);
+  const currentYearData = yearData[0];
+  const totalMonthly = (currentYearData?.annualA ?? 0) / 12 * (household?.mode === 'partner' ? 1 : 1) +
+    (household?.mode === 'partner' ? (currentYearData?.annualB ?? 0) / 12 : 0);
+  const currentYearOverride = yearOverrides.find(o => o.year === forecastYears[0]);
+  const totalBonuses = (currentYearOverride?.person_a_bonus ?? settings?.person_a_bonus ?? 0) +
+    (household?.mode === 'partner' ? (currentYearOverride?.person_b_bonus ?? settings?.person_b_bonus ?? 0) : 0);
   const totalEvents = events.reduce((s, e) => s + e.amount, 0);
 
   // ── Setup gate ────────────────────────────────────────────────────────────
@@ -818,11 +928,23 @@ export default function ForecastPage() {
           <ContributionsModal
             open={contribModal?.open ?? false}
             person={contribModal?.person ?? 'a'}
+            forYear={contribModal?.forYear ?? null}
             household={household}
             settings={settings}
+            yearOverrides={yearOverrides}
             sessions={sessions}
+            forecastYears={forecastYears}
             onClose={() => setContribModal(null)}
             onSave={updated => setSettings(updated)}
+            onSaveYearOverride={override => {
+              setYearOverrides(prev => {
+                const exists = prev.find(o => o.year === override.year);
+                return exists ? prev.map(o => o.year === override.year ? override : o) : [...prev, override];
+              });
+            }}
+            onDeleteYearOverride={year => {
+              setYearOverrides(prev => prev.filter(o => o.year !== year));
+            }}
           />
           <GrowthRateModal
             open={growthModal}
@@ -864,7 +986,7 @@ export default function ForecastPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2b1a]">Forecast</h1>
-            <p className="text-sm text-[#717970] mt-0.5">Your 10-year wealth projection</p>
+            <p className="text-sm text-[#717970] mt-0.5">Your {horizon}-year wealth projection</p>
           </div>
           {/* Horizon toggle */}
           <div className="flex items-center gap-1 bg-white border border-[#c1c9be] rounded-xl p-1">
@@ -905,12 +1027,21 @@ export default function ForecastPage() {
               <tr className="border-b border-[#f0f2f0]">
                 <td
                   className="py-3 px-4 text-sm italic text-[#414940] cursor-pointer hover:underline"
-                  onClick={() => setContribModal({ open: true, person: 'a' })}
+                  onClick={() => setContribModal({ open: true, person: 'a', forYear: null })}
                 >
                   {household?.person_a_name} Contributions
                 </td>
                 {yearData.map((yd, i) => (
-                  <td key={i} className="py-3 px-3 text-sm italic text-[#414940] text-right">£{fmt(yd.annualA)}</td>
+                  <td
+                    key={i}
+                    className="py-3 px-3 text-sm italic text-right cursor-pointer hover:bg-[#f7faf8] relative group"
+                    onClick={() => setContribModal({ open: true, person: 'a', forYear: yd.year })}
+                  >
+                    <span className={yd.hasOverrideA ? 'text-[#396940] font-semibold' : 'text-[#414940]'}>
+                      £{fmt(yd.annualA)}
+                    </span>
+                    {yd.hasOverrideA && <span className="ml-0.5 text-[#396940] text-xs">✦</span>}
+                  </td>
                 ))}
               </tr>
 
@@ -919,12 +1050,21 @@ export default function ForecastPage() {
                 <tr className="border-b border-[#f0f2f0]">
                   <td
                     className="py-3 px-4 text-sm italic text-[#414940] cursor-pointer hover:underline"
-                    onClick={() => setContribModal({ open: true, person: 'b' })}
+                    onClick={() => setContribModal({ open: true, person: 'b', forYear: null })}
                   >
                     {household.person_b_name} Contributions
                   </td>
                   {yearData.map((yd, i) => (
-                    <td key={i} className="py-3 px-3 text-sm italic text-[#414940] text-right">£{fmt(yd.annualB)}</td>
+                    <td
+                      key={i}
+                      className="py-3 px-3 text-sm italic text-right cursor-pointer hover:bg-[#f7faf8]"
+                      onClick={() => setContribModal({ open: true, person: 'b', forYear: yd.year })}
+                    >
+                      <span className={yd.hasOverrideB ? 'text-[#396940] font-semibold' : 'text-[#414940]'}>
+                        £{fmt(yd.annualB)}
+                      </span>
+                      {yd.hasOverrideB && <span className="ml-0.5 text-[#396940] text-xs">✦</span>}
+                    </td>
                   ))}
                 </tr>
               )}
@@ -1029,25 +1169,32 @@ export default function ForecastPage() {
         </div>
 
         {/* Summary bar */}
-        <div className="bg-white rounded-2xl border border-[#e6e9e7] px-6 py-4 flex items-center gap-8 mt-5 flex-wrap mb-8">
-          <div>
-            <p className="text-xs font-semibold text-[#717970] uppercase tracking-wide">📈 Growth Rate</p>
-            <p className="text-sm font-bold text-[#1a2b1a]">{settings?.growth_rate ?? 5}% Avg.</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-[#717970] uppercase tracking-wide">💳 Monthly Sub</p>
-            <p className="text-sm font-bold text-[#1a2b1a]">£{fmt(totalMonthly)} /mo</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-[#717970] uppercase tracking-wide">🎁 Planned Events</p>
-            <p className="text-sm font-bold text-[#1a2b1a]">{fmtShort(totalEvents)} total</p>
+        <div className="bg-white rounded-2xl border border-[#e6e9e7] px-6 py-4 mt-5 mb-8">
+          <p className="text-xs font-bold text-[#717970] uppercase tracking-widest mb-3">Current Year Targets</p>
+          <div className="flex items-center gap-8 flex-wrap">
+            <div>
+              <p className="text-xs font-semibold text-[#717970] uppercase tracking-wide">📈 Growth Rate</p>
+              <p className="text-sm font-bold text-[#1a2b1a]">{settings?.growth_rate ?? 5}% Avg.</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[#717970] uppercase tracking-wide">💳 Monthly Sub</p>
+              <p className="text-sm font-bold text-[#1a2b1a]">£{fmt(totalMonthly)} /mo</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[#717970] uppercase tracking-wide">🎁 Annual Bonus</p>
+              <p className="text-sm font-bold text-[#1a2b1a]">{totalBonuses > 0 ? `£${fmt(totalBonuses)}` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[#717970] uppercase tracking-wide">🗓 Planned Events</p>
+              <p className="text-sm font-bold text-[#1a2b1a]">{fmtShort(totalEvents)} total</p>
+            </div>
           </div>
         </div>
 
         {/* Actuals section */}
         <div>
           <h2 className="text-xl font-bold text-[#1a2b1a] mb-4">How are we tracking?</h2>
-          {pastYears.length === 0 || annualSnapshots.length === 0 ? (
+          {actualsYears.length === 0 ? (
             <div className="bg-white rounded-2xl border border-[#e6e9e7] p-8 text-center">
               <p className="text-sm text-[#717970]">No actuals data yet. Come back after your first Growth update.</p>
             </div>
@@ -1064,29 +1211,41 @@ export default function ForecastPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pastYears.map((y, idx) => {
-                    const planEnd = yearData[idx]?.endBalance ?? 0;
-                    // Get latest snapshot for that year
+                  {actualsYears.map(y => {
+                    const ydIdx = forecastYears.indexOf(y);
+                    const planEnd = yearData[ydIdx]?.endBalance ?? 0;
                     const yearSnaps = annualSnapshots.filter(s => s.year === y);
                     if (yearSnaps.length === 0) {
                       return (
                         <tr key={y} className="border-b border-[#f0f2f0]">
-                          <td className="py-3 px-4 text-sm font-semibold text-[#1a2b1a]">{y}</td>
+                          <td className="py-3 px-4 text-sm font-semibold text-[#1a2b1a]">{y === currentYear ? `${y} (to date)` : y}</td>
                           <td className="py-3 px-4 text-sm text-right text-[#1a2b1a]">£{fmt(planEnd)}</td>
                           <td colSpan={3} className="py-3 px-4 text-sm text-[#9ba99a] text-right">No data</td>
                         </tr>
                       );
                     }
-                    // Sum end_balance by pot for the latest month
-                    const maxMonth = Math.max(...yearSnaps.map(s => s.month));
-                    const latestSnaps = yearSnaps.filter(s => s.month === maxMonth);
+                    // For current year, only use months up to current month
+                    const eligibleSnaps = y === currentYear
+                      ? yearSnaps.filter(s => s.month <= currentMonth)
+                      : yearSnaps;
+                    if (eligibleSnaps.length === 0) {
+                      return (
+                        <tr key={y} className="border-b border-[#f0f2f0]">
+                          <td className="py-3 px-4 text-sm font-semibold text-[#1a2b1a]">{y} (to date)</td>
+                          <td className="py-3 px-4 text-sm text-right text-[#1a2b1a]">£{fmt(planEnd)}</td>
+                          <td colSpan={3} className="py-3 px-4 text-sm text-[#9ba99a] text-right">No data yet this year</td>
+                        </tr>
+                      );
+                    }
+                    const maxMonth = Math.max(...eligibleSnaps.map(s => s.month));
+                    const latestSnaps = eligibleSnaps.filter(s => s.month === maxMonth);
                     const actualEnd = latestSnaps.reduce((sum, s) => sum + s.end_balance, 0);
                     const diff = actualEnd - planEnd;
                     const variance = planEnd !== 0 ? (diff / planEnd) * 100 : 0;
                     const diffColor = diff >= 0 ? '#396940' : '#ba1a1a';
                     return (
                       <tr key={y} className="border-b border-[#f0f2f0]">
-                        <td className="py-3 px-4 text-sm font-semibold text-[#1a2b1a]">{y}</td>
+                        <td className="py-3 px-4 text-sm font-semibold text-[#1a2b1a]">{y === currentYear ? `${y} (to date)` : y}</td>
                         <td className="py-3 px-4 text-sm text-right text-[#1a2b1a]">£{fmt(planEnd)}</td>
                         <td className="py-3 px-4 text-sm text-right font-semibold text-[#1a2b1a]">£{fmt(actualEnd)}</td>
                         <td className="py-3 px-4 text-sm text-right font-bold" style={{ color: diffColor }}>
