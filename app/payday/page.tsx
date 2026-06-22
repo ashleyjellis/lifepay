@@ -22,7 +22,7 @@ interface SessionSummary {
 }
 interface SessionBill { id: string; name: string; amount: number; category: string; }
 interface Allocation { id: string; pot_id: string; amount: number; }
-interface Pot { id: string; name: string; color: string; owner: string; pot_type: string; account_type?: string | null; provider?: string | null; }
+interface Pot { id: string; name: string; color: string; owner: string; pot_type: string; account_type?: string | null; provider?: string | null; target_amount?: number | null; target_months?: number | null; }
 interface SessionDetail { session: SessionSummary; bills: SessionBill[]; allocations: Allocation[]; }
 
 function monthLabel(ym: string) {
@@ -191,9 +191,9 @@ export default function PaydayHome() {
               You can update your baseline any time from <strong>Setup</strong> in the menu.
             </p>
             <button
-              onClick={() => { setOnboardingStep(2); setSelectedMonth(nextMonthYM); }}
+              onClick={() => { setOnboardingStep(2); setSelectedMonth(curYM); }}
               className="w-full bg-[#396940] text-white py-3 rounded-full font-semibold hover:bg-[#2d5533] transition-colors">
-              Got it — show me next steps →
+              Got it — take me to my payday →
             </button>
           </div>
         </div>
@@ -206,8 +206,7 @@ export default function PaydayHome() {
             <div className="bg-[#2d3130] text-white rounded-2xl p-5 shadow-2xl pointer-events-auto" onClick={e => e.stopPropagation()}>
               <div className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Next payday</div>
               <p className="text-sm leading-relaxed mb-3">
-                Your next payday is in <strong>{daysUntilNextPayday} days</strong>. Tap{' '}
-                <strong>{monthShort(nextMonthYM)}</strong> to plan it — confirm your income and bills, then allocate leftover money to savings.
+                Your next payday is in <strong>{daysUntilNextPayday} days</strong>. Fill in your income and expenses below, then allocate your leftover to savings goals. Lock it in on payday.
               </p>
               <button onClick={() => setOnboardingStep(0)} className="w-full border border-white/30 text-white py-2 rounded-full text-sm font-semibold hover:bg-white/10 transition-colors">
                 Let&apos;s go
@@ -282,11 +281,12 @@ export default function PaydayHome() {
               paydayHasPassed && isDraft ? 'bg-[#ffdcc4] text-[#2f1400]' :
               paydayHasPassed && !selectedSession ? 'bg-[#ffdcc4] text-[#2f1400]' :
               isDraft ? 'bg-[#ffdcc4] text-[#2f1400]' :
+              isEditable && selectedMonth === curYM ? 'bg-[#dceeff] text-[#00284e]' :
               isEditable ? 'bg-[#ffdf96] text-[#251a00]' :
               'bg-[#ebeeed] text-[#414940]'
             }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isLocked?'bg-[#396940]':paydayHasPassed&&!isLocked?'bg-[#8e4e14]':isEditable?'bg-[#765a05]':'bg-[#717970]'}`} />
-              {isLocked ? 'Locked in' : paydayHasPassed && isDraft ? 'Awaiting lock-in' : paydayHasPassed && !selectedSession ? 'Payday passed' : isDraft ? 'In progress' : isEditable ? 'Plan ahead' : 'No data'}
+              <span className={`w-1.5 h-1.5 rounded-full ${isLocked?'bg-[#396940]':paydayHasPassed&&!isLocked?'bg-[#8e4e14]':isEditable&&selectedMonth===curYM?'bg-[#0057a8]':isEditable?'bg-[#765a05]':'bg-[#717970]'}`} />
+              {isLocked ? 'Locked in' : paydayHasPassed && isDraft ? 'Awaiting lock-in' : paydayHasPassed && !selectedSession ? 'Payday passed' : isDraft ? 'In progress' : isEditable && selectedMonth === curYM ? 'Pending payday' : isEditable ? 'Plan ahead' : 'No data'}
             </div>
           </div>
 
@@ -595,6 +595,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const [travelB, setTravelB] = useState('');
   const [percentsA, setPercentsA] = useState<Record<string,string>>({});
   const [percentsB, setPercentsB] = useState<Record<string,string>>({});
+  const [inputModeA, setInputModeA] = useState<Record<string,'pct'|'gbp'>>({});
+  const [inputModeB, setInputModeB] = useState<Record<string,'pct'|'gbp'>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const initializedRef = useRef(false);
@@ -748,6 +750,60 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   }
 
   const whoLabel = (who: 'both'|'a'|'b') => who==='both'?'Both':who==='a'?hh.person_a_name:hh.person_b_name;
+
+  function potRec(pot: Pot, monthly: number, available: number): string {
+    if (available <= 0) return '';
+    if (monthly <= 0) {
+      const suggest = Math.round(available * 0.1);
+      return `Nothing allocated yet — 10% would be £${suggest}/mo`;
+    }
+    if (pot.target_amount && pot.target_amount > 0) {
+      const months = Math.ceil(pot.target_amount / monthly);
+      return `£${Math.round(monthly)}/mo → goal in ~${months} month${months === 1 ? '' : 's'}`;
+    }
+    return `£${Math.round(monthly)} allocated this month`;
+  }
+
+  function PotRow({ p, pct, available, onPctChange, inputMode, onToggleMode }: {
+    p: Pot; pct: number; available: number;
+    onPctChange: (val: string) => void;
+    inputMode: 'pct' | 'gbp';
+    onToggleMode: () => void;
+  }) {
+    const amount = available * (pct / 100);
+    const isGbp = inputMode === 'gbp';
+    const displayVal = isGbp ? (amount > 0 ? amount.toFixed(0) : '') : (pct > 0 ? String(pct) : '');
+    function handleChange(raw: string) {
+      const v = parseFloat(raw) || 0;
+      if (isGbp) {
+        onPctChange(available > 0 ? String(Math.min(100, (v / available) * 100)) : '0');
+      } else {
+        onPctChange(raw);
+      }
+    }
+    const rec = p.pot_type === 'short_term' ? potRec(p, amount, available) : '';
+    return (
+      <div className="bg-[#f1f4f2] rounded-xl px-3 py-2.5 space-y-1">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
+          <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">
+            {p.name}
+            {p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}
+          </span>
+          <button onClick={onToggleMode} className="text-xs px-1.5 py-0.5 rounded-md border border-[#c1c9be] text-[#717970] hover:border-[#7bae7f] hover:text-[#396940] font-bold transition-colors shrink-0">
+            {isGbp ? '£' : '%'}
+          </button>
+          <div className="relative w-20 shrink-0">
+            <input type="number" min="0" value={displayVal} onChange={e=>handleChange(e.target.value)} placeholder="0"
+              className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">{isGbp ? '£' : '%'}</span>
+          </div>
+          <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{isGbp ? (pct > 0 ? `${Math.round(pct)}%` : '—') : (amount > 0 ? fmt(amount) : '—')}</span>
+        </div>
+        {rec && <div className="text-xs text-[#9aaa98] pl-4">{rec}</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -927,37 +983,19 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
             </div>
             <div className="space-y-2">
               {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).length>0 && <SLabel>Short-term goals</SLabel>}
-              {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => {
-                const pct = parseFloat(percentsA[p.id])||0; const amount = availableA*(pct/100);
-                return (
-                  <div key={p.id} className="flex items-center gap-2 bg-[#f1f4f2] rounded-xl px-3 py-2.5">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}</span>
-                    <div className="relative w-20 shrink-0">
-                      <input type="number" min="0" max="100" value={percentsA[p.id]??''} onChange={e=>setPercentsA(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                        className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">%</span>
-                    </div>
-                    <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{amount>0?fmt(amount):'—'}</span>
-                  </div>
-                );
-              })}
+              {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => (
+                <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0} available={availableA}
+                  onPctChange={v=>setPercentsA(prev=>({...prev,[p.id]:v}))}
+                  inputMode={inputModeA[p.id]??'pct'}
+                  onToggleMode={()=>setInputModeA(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+              ))}
               {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).length>0 && <SLabel>Long-term savings</SLabel>}
-              {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => {
-                const pct = parseFloat(percentsA[p.id])||0; const amount = availableA*(pct/100);
-                return (
-                  <div key={p.id} className="flex items-center gap-2 bg-[#f1f4f2] rounded-xl px-3 py-2.5">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                    <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}</span>
-                    <div className="relative w-20 shrink-0">
-                      <input type="number" min="0" max="100" value={percentsA[p.id]??''} onChange={e=>setPercentsA(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                        className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">%</span>
-                    </div>
-                    <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{amount>0?fmt(amount):'—'}</span>
-                  </div>
-                );
-              })}
+              {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => (
+                <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0} available={availableA}
+                  onPctChange={v=>setPercentsA(prev=>({...prev,[p.id]:v}))}
+                  inputMode={inputModeA[p.id]??'pct'}
+                  onToggleMode={()=>setInputModeA(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+              ))}
             </div>
             <AddPotRow owner="person_a" onAdd={addPot} />
             <div className={`flex justify-between text-xs mt-3 font-bold ${aReady?'text-[#396940]':'text-[#717970]'}`}>
@@ -974,37 +1012,19 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               </div>
               <div className="space-y-2">
                 {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_b').length>0 && <SLabel>Short-term goals</SLabel>}
-                {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_b').map(p => {
-                  const pct = parseFloat(percentsB[p.id])||0; const amount = availableB*(pct/100);
-                  return (
-                    <div key={p.id} className="flex items-center gap-2 bg-[#f1f4f2] rounded-xl px-3 py-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                      <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}</span>
-                      <div className="relative w-20 shrink-0">
-                        <input type="number" min="0" max="100" value={percentsB[p.id]??''} onChange={e=>setPercentsB(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                          className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">%</span>
-                      </div>
-                      <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{amount>0?fmt(amount):'—'}</span>
-                    </div>
-                  );
-                })}
+                {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_b').map(p => (
+                  <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0} available={availableB}
+                    onPctChange={v=>setPercentsB(prev=>({...prev,[p.id]:v}))}
+                    inputMode={inputModeB[p.id]??'pct'}
+                    onToggleMode={()=>setInputModeB(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+                ))}
                 {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_b').length>0 && <SLabel>Long-term savings</SLabel>}
-                {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_b').map(p => {
-                  const pct = parseFloat(percentsB[p.id])||0; const amount = availableB*(pct/100);
-                  return (
-                    <div key={p.id} className="flex items-center gap-2 bg-[#f1f4f2] rounded-xl px-3 py-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-                      <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">{p.name}{p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}</span>
-                      <div className="relative w-20 shrink-0">
-                        <input type="number" min="0" max="100" value={percentsB[p.id]??''} onChange={e=>setPercentsB(prev=>({...prev,[p.id]:e.target.value}))} placeholder="0"
-                          className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">%</span>
-                      </div>
-                      <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{amount>0?fmt(amount):'—'}</span>
-                    </div>
-                  );
-                })}
+                {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_b').map(p => (
+                  <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0} available={availableB}
+                    onPctChange={v=>setPercentsB(prev=>({...prev,[p.id]:v}))}
+                    inputMode={inputModeB[p.id]??'pct'}
+                    onToggleMode={()=>setInputModeB(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+                ))}
               </div>
               <AddPotRow owner="person_b" onAdd={addPot} />
               <div className={`flex justify-between text-xs mt-3 font-bold ${bReady?'text-[#396940]':'text-[#717970]'}`}>
