@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/payday-db';
+import { getDb, initSchema } from '@/lib/payday-db';
 import { getAuthUser } from '@/lib/payday-auth';
 import { randomUUID } from 'crypto';
 
 async function auth() {
+  await initSchema();
   const user = await getAuthUser();
   if (!user) return null;
   return user;

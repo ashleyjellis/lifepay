@@ -13,7 +13,7 @@ type Mode = 'solo' | 'partner';
 
 interface BillDraft { id: string; name: string; amount: string; }
 interface DebtDraft { id: string; name: string; amount: string; person: 'a' | 'b'; }
-type AccountType = 'savings_account' | 'cash_isa' | 'stocks_isa' | 'lisa' | 'pension' | 'other';
+type AccountType = 'savings_account' | 'cash_isa' | 'stocks_isa' | 'lisa' | 'other';
 interface PotDraft {
   id: string; name: string; targetAmount: string; targetMonths: string;
   color: string; owner: 'person_a' | 'person_b' | 'joint'; potType: 'short_term' | 'long_term';
@@ -47,7 +47,6 @@ const ACCOUNT_TYPES: { value: AccountType; label: string; color: string }[] = [
   { value: 'cash_isa',        label: 'Cash ISA',  color: '#3b82f6' },
   { value: 'stocks_isa',      label: 'S&S ISA',   color: '#6366f1' },
   { value: 'lisa',            label: 'LISA',       color: '#8b5cf6' },
-  { value: 'pension',         label: 'Pension',    color: '#64748b' },
   { value: 'other',           label: 'Other',      color: '#f59e0b' },
 ];
 
@@ -304,7 +303,7 @@ function LongTermPotRow({ pot, onUpdate, onRemove }: {
   const [nameEdited, setNameEdited] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   function autoName(provider: string, accountType: AccountType): string {
-    const labels: Record<AccountType, string> = { savings_account: 'Savings', cash_isa: 'Cash ISA', stocks_isa: 'S&S ISA', lisa: 'LISA', pension: 'Pension', other: '' };
+    const labels: Record<AccountType, string> = { savings_account: 'Savings', cash_isa: 'Cash ISA', stocks_isa: 'S&S ISA', lisa: 'LISA', other: '' };
     const suffix = labels[accountType] ?? '';
     return provider && suffix ? `${provider} ${suffix}` : provider || suffix;
   }
@@ -359,14 +358,6 @@ function LongTermPotRow({ pot, onUpdate, onRemove }: {
         <label className="text-xs text-gray-400 mb-1 block">Label (auto-generated, or customise)</label>
         <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-600"
           placeholder="e.g. Chase Savings" value={pot.name} onChange={e => { setNameEdited(true); onUpdate({ name: e.target.value }); }} />
-      </div>
-      <div>
-        <label className="text-xs text-gray-400 mb-1 block">Monthly contribution (optional)</label>
-        <div className="relative w-36">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
-          <input type="number" min="0" className="w-full pl-7 pr-2 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
-            placeholder="0" value={pot.targetAmount} onChange={e => onUpdate({ targetAmount: e.target.value })} />
-        </div>
       </div>
       {pot.name && <button onClick={() => setCollapsed(true)} className="w-full border border-gray-200 py-2 rounded-xl text-xs font-medium text-gray-500 hover:border-gray-400 transition-colors">Done ✓</button>}
     </div>
@@ -724,7 +715,7 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
             </SField>
             <div className="grid grid-cols-2 gap-3">
               <SField label={isPartner ? 'Person A name' : 'Your name'}><SInput value={nameA} onChange={setNameA} placeholder="e.g. Ashley" /></SField>
-              {isPartner && <SField label="Person B name"><SInput value={nameB} onChange={setNameB} placeholder="e.g. Sam" /></SField>}
+              {isPartner && <SField label="Person B name"><SInput value={nameB} onChange={setNameB} placeholder="e.g. Charlotte" /></SField>}
             </div>
             {isPartner && (
               <SField label={`Joint split — ${nameA || 'A'} pays ${splitA}%, ${nameB || 'B'} pays ${splitB}%`}>
@@ -1090,7 +1081,7 @@ function OnboardingWizard() {
     debts: 'Credit cards, loans, regular debt payments. Skip if none.',
     lifestyle: 'Monthly spending money and travel costs per person.',
     short_term: 'Holidays, celebrations, big purchases — goals with a target date or amount.',
-    long_term: 'ISAs, investment platforms, pensions — accounts you contribute to each month.',
+    long_term: 'ISAs, investment platforms — accounts you contribute to each month.',
   };
 
   const WizardAddBtn = ({ label, onClick }: { label: string; onClick: () => void }) => (
@@ -1145,7 +1136,7 @@ function OnboardingWizard() {
                 {isPartner && (
                   <div>
                     <WizardLabel>Partner B name</WizardLabel>
-                    <WizardInput value={nameB} onChange={setNameB} placeholder="e.g. Sam" />
+                    <WizardInput value={nameB} onChange={setNameB} placeholder="e.g. Charlotte" />
                   </div>
                 )}
               </div>
