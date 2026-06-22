@@ -77,6 +77,7 @@ export async function DELETE(req: Request) {
   if (!pot.rows[0] || !(await assertHousehold(pot.rows[0].household_id as string, user.id))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  await db.execute({ sql: 'DELETE FROM session_allocations WHERE pot_id=?', args: [id] });
   await db.execute({ sql: 'DELETE FROM savings_pots WHERE id=?', args: [id] });
   return NextResponse.json({ ok: true });
 }
