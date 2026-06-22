@@ -521,12 +521,17 @@ function DeleteModal({
   async function handleDelete() {
     if (!pot) return;
     setDeleting(true);
-    const res = await fetch(`/api/payday/pots?id=${pot.id}`, { method: 'DELETE' });
-    if (res.ok) {
-      onDelete(pot.id);
-      onClose();
+    try {
+      const res = await fetch(`/api/payday/pots?id=${pot.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onDelete(pot.id);
+        onClose();
+      } else {
+        setDeleting(false);
+      }
+    } catch {
+      setDeleting(false);
     }
-    setDeleting(false);
   }
 
   return (
