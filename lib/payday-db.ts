@@ -114,6 +114,21 @@ export async function initSchema() {
       FOREIGN KEY (session_id) REFERENCES payday_sessions(id),
       FOREIGN KEY (pot_id) REFERENCES savings_pots(id)
     );
+
+    CREATE TABLE IF NOT EXISTS wealth_snapshots (
+      id TEXT PRIMARY KEY,
+      pot_id TEXT NOT NULL,
+      household_id TEXT NOT NULL,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      start_balance REAL NOT NULL DEFAULT 0,
+      money_in REAL NOT NULL DEFAULT 0,
+      transfer_out REAL NOT NULL DEFAULT 0,
+      end_balance REAL NOT NULL DEFAULT 0,
+      UNIQUE(pot_id, year, month),
+      FOREIGN KEY (pot_id) REFERENCES savings_pots(id),
+      FOREIGN KEY (household_id) REFERENCES households(id)
+    );
   `);
 
   // Migrations — each wrapped so re-runs are safe

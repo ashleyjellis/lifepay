@@ -11,15 +11,6 @@ const quicksand = Quicksand({ subsets: ['latin'] });
 
 const POT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6','#64748b'];
 
-const ACCOUNT_TYPES = [
-  { value: 'savings_account', label: 'Savings', color: '#10b981' },
-  { value: 'cash_isa', label: 'Cash ISA', color: '#3b82f6' },
-  { value: 'stocks_isa', label: 'S&S ISA', color: '#6366f1' },
-  { value: 'lisa', label: 'LISA', color: '#8b5cf6' },
-  { value: 'pension', label: 'Pension', color: '#64748b' },
-  { value: 'other', label: 'Other', color: '#f59e0b' },
-];
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Household {
@@ -59,28 +50,6 @@ function ordinal(n: number): string {
   const s = ['th','st','nd','rd'];
   const v = n % 100;
   return n + (s[(v-20)%10] || s[v] || s[0]);
-}
-
-function accountTypeLabel(t: string | null) {
-  switch (t) {
-    case 'savings_account': return 'Savings Account';
-    case 'cash_isa': return 'Cash ISA';
-    case 'stocks_isa': return 'S&S ISA';
-    case 'lisa': return 'LISA';
-    case 'pension': return 'Pension';
-    default: return 'Other';
-  }
-}
-
-function accountTypeIcon(t: string | null) {
-  switch (t) {
-    case 'savings_account': return '🏦';
-    case 'cash_isa': return '💰';
-    case 'stocks_isa': return '📈';
-    case 'lisa': return '🏠';
-    case 'pension': return '🛡️';
-    default: return '💼';
-  }
 }
 
 function targetDateLabel(targetMonths: number) {
@@ -339,192 +308,6 @@ function GoalModal({
   );
 }
 
-// ── InvestModal ────────────────────────────────────────────────────────────────
-
-function InvestModal({
-  open,
-  pot,
-  household,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  pot: Pot | null;
-  household: Household;
-  onClose: () => void;
-  onSave: (p: Pot) => void;
-}) {
-  const [accountType, setAccountType] = useState('savings_account');
-  const [provider, setProvider] = useState('');
-  const [label, setLabel] = useState('');
-  const [nameEdited, setNameEdited] = useState(false);
-  const [owner, setOwner] = useState<'person_a' | 'person_b' | 'joint'>('person_a');
-  const [contribution, setContribution] = useState('');
-  const [currentBalance, setCurrentBalance] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    if (pot) {
-      setAccountType(pot.account_type || 'savings_account');
-      setProvider(pot.provider || '');
-      setLabel(pot.name);
-      setNameEdited(true);
-      setOwner((pot.owner as 'person_a' | 'person_b' | 'joint') || 'person_a');
-      setContribution(pot.target_amount != null ? String(pot.target_amount) : '');
-      setCurrentBalance(pot.current_balance != null ? String(pot.current_balance) : '');
-    } else {
-      setAccountType('savings_account');
-      setProvider('');
-      setLabel('');
-      setNameEdited(false);
-      setOwner('person_a');
-      setContribution('');
-      setCurrentBalance('');
-    }
-  }, [open, pot]);
-
-  // Auto-generate label
-  useEffect(() => {
-    if (!nameEdited) {
-      const typeLabel = ACCOUNT_TYPES.find(a => a.value === accountType)?.label || '';
-      setLabel(provider ? `${provider} ${typeLabel}` : typeLabel);
-    }
-  }, [accountType, provider, nameEdited]);
-
-  if (!open) return null;
-
-  async function handleSave() {
-    setSaving(true);
-    const typeColor = ACCOUNT_TYPES.find(a => a.value === accountType)?.color || POT_COLORS[0];
-    const body = {
-      householdId: household.id,
-      name: label,
-      owner,
-      targetAmount: parseFloat(contribution) || null,
-      targetMonths: null,
-      targetDate: null,
-      color: typeColor,
-      potType: 'long_term',
-      accountType,
-      provider: provider || null,
-      ...(pot ? { id: pot.id } : {}),
-    };
-    const res = await fetch('/api/payday/pots', {
-      method: pot ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const saved: Pot = await res.json();
-      if (currentBalance !== '') {
-        await fetch('/api/payday/savings', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: saved.id, currentBalance: parseFloat(currentBalance) || 0 }),
-        });
-        saved.current_balance = parseFloat(currentBalance) || 0;
-      }
-      onSave(saved);
-      onClose();
-    }
-    setSaving(false);
-  }
-
-  const ownerOptions: { value: 'person_a' | 'person_b' | 'joint'; label: string }[] = [
-    { value: 'person_a', label: household.person_a_name },
-    ...(household.mode === 'partner' ? [{ value: 'person_b' as const, label: household.person_b_name }] : []),
-    { value: 'joint', label: 'Joint' },
-  ];
-
-  return (
-    <div className={MODAL_BACKDROP} onClick={onClose}>
-      <div className={MODAL_CARD + ' max-h-[90vh] overflow-y-auto'} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[#1a2b1a]">{pot ? 'Edit Investment' : 'Add Investment'}</h2>
-          <button onClick={onClose} className="text-2xl text-[#717970] hover:text-[#1a2b1a] leading-none">×</button>
-        </div>
-
-        <div className="space-y-5">
-          {/* Account type */}
-          <div>
-            <p className={LABEL_CLS}>Account type</p>
-            <div className="flex gap-2 flex-wrap">
-              {ACCOUNT_TYPES.map(a => (
-                <button key={a.value} onClick={() => setAccountType(a.value)}
-                  className={`px-3 py-2 rounded-full text-sm font-semibold transition-colors ${
-                    accountType === a.value ? 'text-white' : 'bg-[#f0f0eb] text-[#414940] hover:bg-[#e0e5e0]'
-                  }`}
-                  style={accountType === a.value ? { background: a.color } : {}}>
-                  {a.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Provider */}
-          <div>
-            <p className={LABEL_CLS}>Provider</p>
-            <input type="text" value={provider} onChange={e => setProvider(e.target.value)}
-              placeholder="e.g. Vanguard, Chase, Marcus" className={INPUT_CLS} />
-          </div>
-
-          {/* Label */}
-          <div>
-            <p className={LABEL_CLS}>Label</p>
-            <input type="text" value={label}
-              onChange={e => { setLabel(e.target.value); setNameEdited(true); }}
-              placeholder="Account label" className={INPUT_CLS} />
-          </div>
-
-          {/* Owner */}
-          <div>
-            <p className={LABEL_CLS}>Owner</p>
-            <div className="flex gap-2 flex-wrap">
-              {ownerOptions.map(o => (
-                <button key={o.value} onClick={() => setOwner(o.value)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-                    owner === o.value ? 'bg-[#396940] text-white' : 'bg-[#f0f0eb] text-[#414940] hover:bg-[#e0e5e0]'
-                  }`}>
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Monthly contribution */}
-          <div>
-            <p className={LABEL_CLS}>Monthly contribution (optional)</p>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-[#717970]">£</span>
-              <input type="number" value={contribution} onChange={e => setContribution(e.target.value)}
-                placeholder="0.00" className={INPUT_CLS + ' pl-8'} />
-            </div>
-          </div>
-
-          {/* Current balance */}
-          <div>
-            <p className={LABEL_CLS}>Current balance (optional)</p>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-[#717970]">£</span>
-              <input type="number" value={currentBalance} onChange={e => setCurrentBalance(e.target.value)}
-                placeholder="0.00" className={INPUT_CLS + ' pl-8'} />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-7">
-          <button onClick={onClose} className={BTN_SECONDARY + ' flex-1'}>Cancel</button>
-          <button onClick={handleSave} disabled={saving || !label.trim()}
-            className={BTN_PRIMARY + ' flex-1 disabled:opacity-50'}>
-            {saving ? 'Saving…' : pot ? 'Save Changes' : 'Add Investment'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── DeleteModal ────────────────────────────────────────────────────────────────
 
 function DeleteModal({
@@ -656,110 +439,6 @@ function AddGoalCard({ onClick }: { onClick: () => void }) {
   );
 }
 
-// ── WealthCard ────────────────────────────────────────────────────────────────
-
-function WealthCard({
-  pot,
-  lastPayday,
-  onBalanceUpdate,
-  onEdit,
-  onDelete,
-}: {
-  pot: Pot;
-  lastPayday: number;
-  onBalanceUpdate: (id: string, balance: number) => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState(String(pot.current_balance ?? 0));
-  const [saved, setSaved] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) inputRef.current?.select();
-  }, [editing]);
-
-  async function save() {
-    const val = parseFloat(inputVal) || 0;
-    setEditing(false);
-    await fetch('/api/payday/savings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: pot.id, currentBalance: val }),
-    });
-    onBalanceUpdate(pot.id, val);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  const balance = pot.current_balance ?? 0;
-
-  return (
-    <div className="bg-white rounded-2xl border border-[#e6e9e7] p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{accountTypeIcon(pot.account_type)}</span>
-          <div>
-            <p className="text-xs text-[#717970]">{accountTypeLabel(pot.account_type)}</p>
-            <p className="font-semibold text-[#1a2b1a] text-sm">{pot.provider ?? pot.name}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {lastPayday > 0 && (
-            <span className="bg-[#e8f5e9] text-[#2e7d32] rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap">
-              Last payday: £{fmt(lastPayday)}
-            </span>
-          )}
-          <div className="flex items-center gap-1">
-            <button onClick={onEdit} className="text-[#9ba99a] hover:text-[#396940] transition-colors p-1">
-              <PencilIcon />
-            </button>
-            <button onClick={onDelete} className="text-[#9ba99a] hover:text-[#ba1a1a] transition-colors p-1">
-              <TrashIcon />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <p className="text-xs text-[#717970] mb-1">Current Balance</p>
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <span className="text-[#396940] font-bold">£</span>
-            <input
-              ref={inputRef}
-              type="number"
-              value={inputVal}
-              onChange={e => setInputVal(e.target.value)}
-              onBlur={save}
-              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-              className="text-lg font-bold text-[#1a2b1a] border-b-2 border-[#7bae7f] outline-none w-32 bg-transparent"
-            />
-          </div>
-        ) : (
-          <button
-            onClick={() => { setInputVal(String(balance)); setEditing(true); }}
-            className="text-lg font-bold text-[#1a2b1a] hover:text-[#396940] transition-colors text-left"
-          >
-            £{fmt(balance)}
-            {saved && <span className="ml-2 text-xs text-[#7bae7f] font-normal">Saved ✓</span>}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function AddWealthCard({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="w-full bg-white rounded-2xl border-2 border-dashed border-[#c1c9be] p-4 flex flex-col items-center justify-center min-h-[100px] text-[#9ba99a] cursor-pointer hover:border-[#7bae7f] hover:text-[#7bae7f] transition-colors">
-      <span className="text-xl mb-1">⊞</span>
-      <span className="text-sm">Add Investment</span>
-    </button>
-  );
-}
-
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
 function GridIcon() {
@@ -866,68 +545,6 @@ function GoalTableRow({ pot, totalSaved, ownerLabel, ownerInitial, onEdit, onDel
   );
 }
 
-function WealthTableRow({ pot, lastPayday, onBalanceUpdate, ownerInitial, onEdit, onDelete }: {
-  pot: Pot; lastPayday: number; ownerInitial: string;
-  onBalanceUpdate: (id: string, balance: number) => void;
-  onEdit: () => void; onDelete: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState(String(pot.current_balance ?? 0));
-  const [saved, setSaved] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
-
-  async function save() {
-    const val = parseFloat(inputVal) || 0;
-    setEditing(false);
-    await fetch('/api/payday/savings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: pot.id, currentBalance: val }) });
-    onBalanceUpdate(pot.id, val);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  const balance = pot.current_balance ?? 0;
-
-  return (
-    <tr className="border-b border-[#f0f2f0] hover:bg-[#fafcfa] transition-colors">
-      <td className="py-4 px-4">
-        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#396940] text-white text-xs font-bold">
-          {ownerInitial}
-        </span>
-      </td>
-      <td className="py-4 px-2">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{accountTypeIcon(pot.account_type)}</span>
-          <span className="text-sm font-semibold text-[#1a2b1a]">{accountTypeLabel(pot.account_type)}</span>
-        </div>
-      </td>
-      <td className="py-4 px-2 text-sm text-[#414940] font-medium">{pot.provider ?? pot.name}</td>
-      <td className="py-4 px-2">
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <span className="text-[#396940] font-bold text-sm">£</span>
-            <input ref={inputRef} type="number" value={inputVal} onChange={e => setInputVal(e.target.value)}
-              onBlur={save} onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-              className="text-lg font-bold text-[#1a2b1a] border-b-2 border-[#7bae7f] outline-none w-28 bg-transparent" />
-          </div>
-        ) : (
-          <button onClick={() => { setInputVal(String(balance)); setEditing(true); }}
-            className="text-lg font-bold text-[#1a2b1a] hover:text-[#396940] transition-colors text-left">
-            £{fmt(balance)}{saved && <span className="ml-2 text-xs text-[#7bae7f] font-normal">✓</span>}
-          </button>
-        )}
-      </td>
-      <td className="py-4 px-4">
-        <div className="flex items-center gap-3 text-[#9ba99a]">
-          <button onClick={onEdit} className="hover:text-[#396940] transition-colors"><PencilIcon /></button>
-          <button onClick={onDelete} className="hover:text-[#ba1a1a] transition-colors"><TrashIcon /></button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 export default function SavingsPage() {
   const router = useRouter();
   const [household, setHousehold] = useState<Household | null>(null);
@@ -939,7 +556,6 @@ export default function SavingsPage() {
 
   // Modal state
   const [goalModal, setGoalModal] = useState<{ open: boolean; pot: Pot | null }>({ open: false, pot: null });
-  const [investModal, setInvestModal] = useState<{ open: boolean; pot: Pot | null }>({ open: false, pot: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; pot: Pot | null }>({ open: false, pot: null });
 
   useEffect(() => {
@@ -965,10 +581,6 @@ export default function SavingsPage() {
     load();
   }, [router]);
 
-  function handleBalanceUpdate(id: string, balance: number) {
-    setPots(prev => prev.map(p => p.id === id ? { ...p, current_balance: balance } : p));
-  }
-
   function handleGoalSave(saved: Pot, savedAmount?: number) {
     setPots(prev => {
       const exists = prev.find(p => p.id === saved.id);
@@ -977,13 +589,6 @@ export default function SavingsPage() {
     if (savedAmount !== undefined) {
       setSavingsMap(prev => ({ ...prev, [saved.id]: savedAmount }));
     }
-  }
-
-  function handleInvestSave(saved: Pot) {
-    setPots(prev => {
-      const exists = prev.find(p => p.id === saved.id);
-      return exists ? prev.map(p => p.id === saved.id ? saved : p) : [...prev, saved];
-    });
   }
 
   function handleDelete(id: string) {
@@ -999,20 +604,13 @@ export default function SavingsPage() {
   }
 
   const shortTermPots = pots.filter(p => p.pot_type === 'short_term');
-  const longTermPots = pots.filter(p => p.pot_type === 'long_term');
 
   const filteredShort = filterOwner === 'all'
     ? shortTermPots
     : shortTermPots.filter(p => p.owner === filterOwner);
 
-  const filteredLong = filterOwner === 'all'
-    ? longTermPots
-    : longTermPots.filter(p => p.owner === filterOwner);
-
   const thisMonth = filteredShort.filter(p => p.target_months != null && p.target_months <= 3);
   const comingUp = filteredShort.filter(p => p.target_months == null || p.target_months > 3);
-
-  const ltOwners = ['person_a', 'person_b', 'joint'] as const;
 
   function ownerLabel(owner: string) {
     if (!household) return owner;
@@ -1051,13 +649,6 @@ export default function SavingsPage() {
             onClose={() => setGoalModal({ open: false, pot: null })}
             onSave={handleGoalSave}
           />
-          <InvestModal
-            open={investModal.open}
-            pot={investModal.pot}
-            household={household}
-            onClose={() => setInvestModal({ open: false, pot: null })}
-            onSave={handleInvestSave}
-          />
         </>
       )}
       <DeleteModal
@@ -1073,7 +664,8 @@ export default function SavingsPage() {
           <div className="text-[#396940] font-bold text-lg tracking-tight">Payd</div>
           <div className="flex gap-5 items-center">
             <Link href="/payday" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Paydays</Link>
-            <Link href="/payday/savings" className="text-sm text-[#396940] font-semibold transition-colors">Savings & Investments</Link>
+            <Link href="/payday/savings" className="text-sm text-[#396940] font-semibold transition-colors">Short Savings</Link>
+            <Link href="/payday/growth" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Growth</Link>
             <Link href="/payday/setup" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Setup</Link>
             <button
               onClick={async () => { await fetch('/api/payday/auth/logout', { method: 'POST' }); router.push('/payday/login'); }}
@@ -1086,7 +678,7 @@ export default function SavingsPage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-5 pt-6 pb-12">
-        <h1 className="text-2xl font-bold text-[#1a2b1a] mb-5">Savings & Investments</h1>
+        <h1 className="text-2xl font-bold text-[#1a2b1a] mb-5">Short Savings</h1>
 
         {/* Filter pills + view toggle */}
         <div className="flex items-center justify-between gap-2 mb-7 flex-wrap">
@@ -1204,72 +796,6 @@ export default function SavingsPage() {
           )}
         </div>
 
-        {/* ── Section 2: Savings & Investments ── */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-[#1a2b1a]">Savings & Investments</h2>
-            {viewMode === 'table' && (
-              <button onClick={() => setInvestModal({ open: true, pot: null })}
-                className="flex items-center gap-1 text-sm text-[#7bae7f] font-semibold hover:text-[#396940] transition-colors">
-                <span className="text-base">⊞</span> Add Investment
-              </button>
-            )}
-          </div>
-
-          {viewMode === 'grid' ? (
-            <>
-              {ltOwners.map(owner => {
-                const ownerPots = filteredLong.filter(p => p.owner === owner);
-                if (ownerPots.length === 0) return null;
-                return (
-                  <div key={owner} className="mb-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#396940] text-white text-xs font-bold">{ownerInitial(owner)}</span>
-                      <span className="font-semibold text-[#1a2b1a] text-sm">{ownerLabel(owner)}</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {ownerPots.map(pot => (
-                        <WealthCard key={pot.id} pot={pot} lastPayday={savingsMap[pot.id] ?? 0}
-                          onBalanceUpdate={handleBalanceUpdate}
-                          onEdit={() => setInvestModal({ open: true, pot })}
-                          onDelete={() => setDeleteModal({ open: true, pot })} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-              {filteredLong.length === 0 && <p className="text-sm text-[#9ba99a] mb-3">No investments yet.</p>}
-              <div className="mt-2 max-w-xs">
-                <AddWealthCard onClick={() => setInvestModal({ open: true, pot: null })} />
-              </div>
-            </>
-          ) : (
-            <div className="bg-white rounded-2xl border border-[#e6e9e7] overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#e6e9e7]">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#717970] uppercase tracking-wide">Owner</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-[#717970] uppercase tracking-wide">Product Name</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-[#717970] uppercase tracking-wide">Provider</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-[#717970] uppercase tracking-wide">Current Balance</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#717970] uppercase tracking-wide">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLong.map(pot => (
-                    <WealthTableRow key={pot.id} pot={pot} lastPayday={savingsMap[pot.id] ?? 0}
-                      ownerInitial={ownerInitial(pot.owner)} onBalanceUpdate={handleBalanceUpdate}
-                      onEdit={() => setInvestModal({ open: true, pot })}
-                      onDelete={() => setDeleteModal({ open: true, pot })} />
-                  ))}
-                  {filteredLong.length === 0 && (
-                    <tr><td colSpan={5} className="py-8 text-center text-sm text-[#9ba99a]">No investments yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
