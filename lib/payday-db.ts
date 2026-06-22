@@ -129,6 +129,28 @@ export async function initSchema() {
       FOREIGN KEY (pot_id) REFERENCES savings_pots(id),
       FOREIGN KEY (household_id) REFERENCES households(id)
     );
+
+    CREATE TABLE IF NOT EXISTS forecast_settings (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL UNIQUE,
+      growth_rate REAL NOT NULL DEFAULT 5.0,
+      person_a_monthly REAL NOT NULL DEFAULT 0,
+      person_b_monthly REAL NOT NULL DEFAULT 0,
+      person_a_bonus REAL NOT NULL DEFAULT 0,
+      person_b_bonus REAL NOT NULL DEFAULT 0,
+      horizon INTEGER NOT NULL DEFAULT 10,
+      start_year INTEGER NOT NULL DEFAULT 2026,
+      FOREIGN KEY (household_id) REFERENCES households(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS forecast_events (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      year INTEGER NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      FOREIGN KEY (household_id) REFERENCES households(id)
+    );
   `);
 
   // Migrations — each wrapped so re-runs are safe
