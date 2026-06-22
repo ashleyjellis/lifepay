@@ -182,6 +182,7 @@ export async function initSchema() {
     'ALTER TABLE savings_pots ADD COLUMN current_balance REAL',
     'ALTER TABLE savings_pots ADD COLUMN target_date TEXT',
     'ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE households ADD COLUMN payday_day_b INTEGER NOT NULL DEFAULT 25',
   ];
 
   for (const sql of migrations) {

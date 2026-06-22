@@ -35,7 +35,7 @@ interface EditPot {
 interface HouseholdRow {
   id: string; name: string; mode: 'solo' | 'partner';
   person_a_name: string; person_b_name: string;
-  joint_split_a: number; payday_day: number;
+  joint_split_a: number; payday_day: number; payday_day_b: number;
   default_spending_a: number; default_spending_b: number;
   default_transport_a: number; default_transport_b: number;
 }
@@ -480,6 +480,7 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
   const [nameB, setNameB] = useState(initialHh.person_b_name);
   const [splitA, setSplitA] = useState(String(initialHh.joint_split_a));
   const [paydayDay, setPaydayDay] = useState(String(initialHh.payday_day));
+  const [paydayDayB, setPaydayDayB] = useState(String(initialHh.payday_day_b ?? initialHh.payday_day));
   const [hhSaving, setHhSaving] = useState(false);
   const [hhSaved, setHhSaved] = useState(false);
 
@@ -555,6 +556,7 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
         personAName: nameA, personBName: nameB,
         jointSplitA: parseInt(splitA) || 50,
         paydayDay: parseInt(paydayDay) || 25,
+        paydayDayB: hhMode === 'partner' ? (parseInt(paydayDayB) || 25) : (parseInt(paydayDay) || 25),
         defaultSpendingA: parseFloat(spendingA) || 0,
         defaultSpendingB: parseFloat(spendingB) || 0,
         defaultTransportA: parseFloat(transportA) || 0,
@@ -706,7 +708,7 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
 
           <SettingsSection
             icon="🏠" title="Household"
-            summary={`${hh.name} · ${hh.mode === 'partner' ? `${hh.person_a_name} & ${hh.person_b_name}` : hh.person_a_name} · Payday day ${hh.payday_day}`}
+            summary={`${hh.name} · ${hh.mode === 'partner' ? `${hh.person_a_name} & ${hh.person_b_name}` : hh.person_a_name} · Payday ${hh.mode === 'partner' && hh.payday_day_b && hh.payday_day_b !== hh.payday_day ? `${hh.person_a_name} ${hh.payday_day}th / ${hh.person_b_name} ${hh.payday_day_b}th` : `day ${hh.payday_day}`}`}
             onSave={saveHousehold} saving={hhSaving} saved={hhSaved}
           >
             <SField label="Household name"><SInput value={hhName} onChange={setHhName} placeholder="e.g. The Smiths" /></SField>
@@ -730,10 +732,27 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
                   className="w-full accent-[#396940]" />
               </SField>
             )}
-            <SField label="Payday day of month">
-              <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
-                className="w-24 border border-[#c1c9be] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-center font-semibold" />
-            </SField>
+            {isPartner ? (
+              <SField label="Payday days of month">
+                <div className="flex gap-4">
+                  <div>
+                    <div className="text-xs text-[#717970] mb-1">{nameA || 'Person A'}</div>
+                    <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
+                      className="w-24 border border-[#c1c9be] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-center font-semibold" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-[#717970] mb-1">{nameB || 'Person B'}</div>
+                    <input type="number" min="1" max="31" value={paydayDayB} onChange={e => setPaydayDayB(e.target.value)}
+                      className="w-24 border border-[#c1c9be] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-center font-semibold" />
+                  </div>
+                </div>
+              </SField>
+            ) : (
+              <SField label="Payday day of month">
+                <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
+                  className="w-24 border border-[#c1c9be] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-center font-semibold" />
+              </SField>
+            )}
           </SettingsSection>
 
           <SettingsSection
@@ -957,6 +976,7 @@ function OnboardingWizard() {
   const [nameB, setNameB] = useState('');
   const [splitA, setSplitA] = useState('50');
   const [paydayDay, setPaydayDay] = useState('25');
+  const [paydayDayB, setPaydayDayB] = useState('25');
 
   const [jointBills, setJointBills] = useState<BillDraft[]>(DEFAULT_JOINT_BILLS);
   const [billsA, setBillsA] = useState<BillDraft[]>([]);
@@ -1011,7 +1031,7 @@ function OnboardingWizard() {
     try {
       const hhRes = await fetch('/api/payday/households', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: hhName || 'Our Household', mode, personAName: nameA || 'Person A', personBName: nameB || 'Person B', jointSplitA: parseInt(splitA) || 50, paydayDay: parseInt(paydayDay) || 25, defaultSpendingA: parseFloat(spendingA) || 0, defaultSpendingB: parseFloat(spendingB) || 0, defaultTransportA: parseFloat(transportA) || 0, defaultTransportB: parseFloat(transportB) || 0 }),
+        body: JSON.stringify({ name: hhName || 'Our Household', mode, personAName: nameA || 'Person A', personBName: nameB || 'Person B', jointSplitA: parseInt(splitA) || 50, paydayDay: parseInt(paydayDay) || 25, paydayDayB: isPartner ? (parseInt(paydayDayB) || 25) : (parseInt(paydayDay) || 25), defaultSpendingA: parseFloat(spendingA) || 0, defaultSpendingB: parseFloat(spendingB) || 0, defaultTransportA: parseFloat(transportA) || 0, defaultTransportB: parseFloat(transportB) || 0 }),
       });
       const hh = await hhRes.json();
       const hhId = hh.id;
@@ -1142,14 +1162,39 @@ function OnboardingWizard() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <WizardLabel>Payday date</WizardLabel>
-                <div className="flex items-center gap-3">
-                  <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
-                    className="w-24 bg-[#f0f0eb] border-0 rounded-2xl px-4 py-4 text-center text-sm font-bold text-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#7bae7f]" />
-                  <span className="text-sm text-[#9aaa98]">of each month</span>
+              {isPartner ? (
+                <div className="space-y-3">
+                  <WizardLabel>Payday dates</WizardLabel>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-[#f0f0eb] rounded-2xl px-4 py-3">
+                      <div className="text-xs font-semibold text-[#7bae7f] uppercase tracking-wide mb-1.5">{nameA || 'Person A'}</div>
+                      <div className="flex items-center gap-2">
+                        <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
+                          className="w-16 bg-white border-0 rounded-xl px-3 py-2 text-center text-sm font-bold text-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#7bae7f]" />
+                        <span className="text-xs text-[#9aaa98]">of each month</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 bg-[#f0f0eb] rounded-2xl px-4 py-3">
+                      <div className="text-xs font-semibold text-[#7bae7f] uppercase tracking-wide mb-1.5">{nameB || 'Person B'}</div>
+                      <div className="flex items-center gap-2">
+                        <input type="number" min="1" max="31" value={paydayDayB} onChange={e => setPaydayDayB(e.target.value)}
+                          className="w-16 bg-white border-0 rounded-xl px-3 py-2 text-center text-sm font-bold text-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#7bae7f]" />
+                        <span className="text-xs text-[#9aaa98]">of each month</span>
+                      </div>
+                    </div>
+                  </div>
+                  <WizardInfoBox>We&apos;ll use both payday dates to generate your monthly sessions.</WizardInfoBox>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  <WizardLabel>Payday date</WizardLabel>
+                  <div className="flex items-center gap-3">
+                    <input type="number" min="1" max="31" value={paydayDay} onChange={e => setPaydayDay(e.target.value)}
+                      className="w-24 bg-[#f0f0eb] border-0 rounded-2xl px-4 py-4 text-center text-sm font-bold text-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#7bae7f]" />
+                    <span className="text-sm text-[#9aaa98]">of each month</span>
+                  </div>
+                </div>
+              )}
 
               <WizardNextBtn onClick={next} label="That's a great start. Next, let's look at bills" />
             </div>
