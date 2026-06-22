@@ -62,7 +62,8 @@ export async function PUT(req: Request) {
     sql: 'UPDATE savings_pots SET name=?, target_amount=?, target_months=?, target_date=?, color=?, owner=?, pot_type=?, sort_order=?, account_type=?, provider=? WHERE id=?',
     args: [body.name, body.targetAmount ?? null, body.targetMonths ?? null, body.targetDate ?? null, body.color, body.owner ?? 'joint', body.potType ?? 'short_term', body.sortOrder ?? 0, body.accountType ?? null, body.provider ?? null, body.id],
   });
-  return NextResponse.json({ ok: true });
+  const updated = await db.execute({ sql: 'SELECT * FROM savings_pots WHERE id=?', args: [body.id] });
+  return NextResponse.json(updated.rows[0]);
 }
 
 export async function DELETE(req: Request) {
