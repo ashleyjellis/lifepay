@@ -22,36 +22,29 @@ function fmt(d: string) {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function ConfirmDeleteModal({
-  user, onConfirm, onCancel,
-}: { user: User; onConfirm: () => void; onCancel: () => void }) {
+function ConfirmModal({
+  title, icon, description, details, confirmWord, confirmLabel, confirmClass, onConfirm, onCancel,
+}: {
+  title: string; icon: string; description: React.ReactNode; details: React.ReactNode;
+  confirmWord: string; confirmLabel: string; confirmClass: string;
+  onConfirm: () => void; onCancel: () => void;
+}) {
   const [typed, setTyped] = useState('');
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-3xl p-7 max-w-md w-full mx-4 shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-xl">⚠</div>
-          <h2 className="text-lg font-bold text-[#1a2b1a]">Delete user & all data</h2>
+          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-xl">{icon}</div>
+          <h2 className="text-lg font-bold text-[#1a2b1a]">{title}</h2>
         </div>
-        <p className="text-sm text-[#414940] mb-2">
-          This will permanently delete <span className="font-semibold text-[#1a2b1a]">{user.email}</span> and all associated data:
-        </p>
-        <ul className="text-sm text-[#717970] mb-4 space-y-0.5 list-disc list-inside">
-          <li>{user.household_count} household{user.household_count !== 1 ? 's' : ''}</li>
-          {user.households.map(h => (
-            <li key={h.id} className="ml-4 list-none text-xs">
-              — {h.name}: {h.session_count} paydays, {h.pot_count} pots
-            </li>
-          ))}
-          <li>All payday sessions, savings, growth snapshots, forecasts</li>
-          <li>All auth sessions (user will be signed out everywhere)</li>
-        </ul>
-        <p className="text-sm text-[#414940] mb-3">Type <span className="font-mono font-bold">DELETE</span> to confirm:</p>
+        <div className="text-sm text-[#414940] mb-2">{description}</div>
+        <ul className="text-sm text-[#717970] mb-4 space-y-0.5 list-disc list-inside">{details}</ul>
+        <p className="text-sm text-[#414940] mb-3">Type <span className="font-mono font-bold">{confirmWord}</span> to confirm:</p>
         <input
           type="text"
           value={typed}
           onChange={e => setTyped(e.target.value)}
-          placeholder="DELETE"
+          placeholder={confirmWord}
           className="w-full bg-[#f0f0eb] border-0 rounded-2xl px-4 py-3 text-sm font-medium text-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-red-400 mb-5"
           autoFocus
         />
@@ -61,10 +54,10 @@ function ConfirmDeleteModal({
           </button>
           <button
             onClick={onConfirm}
-            disabled={typed !== 'DELETE'}
-            className="flex-1 bg-red-600 text-white py-3 rounded-full font-semibold hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={typed !== confirmWord}
+            className={`flex-1 py-3 rounded-full font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${confirmClass}`}
           >
-            Delete permanently
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -78,7 +71,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [clearTarget, setClearTarget] = useState<User | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [clearing, setClearing] = useState<string | null>(null);
   const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
@@ -113,6 +108,20 @@ export default function AdminPage() {
     setDeleting(null);
   }
 
+  async function handleClearData(user: User) {
+    setClearing(user.id);
+    setClearTarget(null);
+    const res = await fetch(`/api/payday/admin?userId=${user.id}`, { method: 'POST' });
+    if (res.ok) {
+      // Refresh to reflect cleared household data
+      await load();
+    } else {
+      const err = await res.json();
+      setError(err.error ?? 'Clear failed');
+    }
+    setClearing(null);
+  }
+
   async function handleToggleAdmin(user: User) {
     setTogglingAdmin(user.id);
     const res = await fetch('/api/payday/admin', {
@@ -133,10 +142,42 @@ export default function AdminPage() {
   return (
     <div className={`min-h-screen bg-[#f7faf8] ${quicksand.className}`}>
       {deleteTarget && (
-        <ConfirmDeleteModal
-          user={deleteTarget}
+        <ConfirmModal
+          title="Delete user & all data"
+          icon="⚠"
+          description={<>This will permanently delete <span className="font-semibold text-[#1a2b1a]">{deleteTarget.email}</span> and all associated data:</>}
+          details={<>
+            <li>{deleteTarget.household_count} household{deleteTarget.household_count !== 1 ? 's' : ''}</li>
+            {deleteTarget.households.map(h => (
+              <li key={h.id} className="ml-4 list-none text-xs">— {h.name}: {h.session_count} paydays, {h.pot_count} pots</li>
+            ))}
+            <li>All payday sessions, savings, growth snapshots, forecasts</li>
+            <li>All auth sessions (user will be signed out everywhere)</li>
+          </>}
+          confirmWord="DELETE"
+          confirmLabel="Delete permanently"
+          confirmClass="bg-red-600 text-white hover:bg-red-700"
           onConfirm={() => handleDelete(deleteTarget)}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+      {clearTarget && (
+        <ConfirmModal
+          title="Clear all user data"
+          icon="🗑"
+          description={<>This will erase all data for <span className="font-semibold text-[#1a2b1a]">{clearTarget.email}</span> and reset them to a fresh account. Their login credentials will be kept.</>}
+          details={<>
+            <li>{clearTarget.household_count} household{clearTarget.household_count !== 1 ? 's' : ''} and all settings</li>
+            {clearTarget.households.map(h => (
+              <li key={h.id} className="ml-4 list-none text-xs">— {h.name}: {h.session_count} paydays, {h.pot_count} pots</li>
+            ))}
+            <li>All payday sessions, savings, growth snapshots, forecasts</li>
+          </>}
+          confirmWord="CLEAR"
+          confirmLabel="Clear all data"
+          confirmClass="bg-orange-500 text-white hover:bg-orange-600"
+          onConfirm={() => handleClearData(clearTarget)}
+          onCancel={() => setClearTarget(null)}
         />
       )}
 
@@ -246,13 +287,22 @@ export default function AdminPage() {
                         </button>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => setDeleteTarget(user)}
-                          disabled={deleting === user.id}
-                          className="text-xs text-red-600 hover:text-red-800 font-semibold px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-40"
-                        >
-                          {deleting === user.id ? 'Deleting…' : 'Delete'}
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setClearTarget(user)}
+                            disabled={clearing === user.id || deleting === user.id}
+                            className="text-xs text-orange-600 hover:text-orange-800 font-semibold px-3 py-1.5 rounded-xl hover:bg-orange-50 transition-colors disabled:opacity-40"
+                          >
+                            {clearing === user.id ? 'Clearing…' : 'Clear data'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(user)}
+                            disabled={deleting === user.id || clearing === user.id}
+                            className="text-xs text-red-600 hover:text-red-800 font-semibold px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-40"
+                          >
+                            {deleting === user.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {expandedUser === user.id && user.households.length > 0 && (
