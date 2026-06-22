@@ -132,14 +132,16 @@ function GoalModal({
   open,
   pot,
   household,
+  totalSaved,
   onClose,
   onSave,
 }: {
   open: boolean;
   pot: Pot | null;
   household: Household;
+  totalSaved: number;
   onClose: () => void;
-  onSave: (p: Pot) => void;
+  onSave: (p: Pot, savedAmount?: number) => void;
 }) {
   const [name, setName] = useState('');
   const [owner, setOwner] = useState<'person_a' | 'person_b' | 'joint'>('person_a');
@@ -148,6 +150,7 @@ function GoalModal({
   const [blendMonths, setBlendMonths] = useState('12');
   const [targetDate, setTargetDate] = useState('');
   const [color, setColor] = useState(POT_COLORS[0]);
+  const [currentValue, setCurrentValue] = useState('');
   const [saving, setSaving] = useState(false);
 
   const monthOptions = generateMonthOptions();
@@ -159,6 +162,7 @@ function GoalModal({
       setOwner((pot.owner as 'person_a' | 'person_b' | 'joint') || 'person_a');
       setTargetAmount(pot.target_amount != null ? String(pot.target_amount) : '');
       setColor(pot.color || POT_COLORS[0]);
+      setCurrentValue(totalSaved > 0 ? String(totalSaved) : '');
       if (pot.target_date) {
         setTargetMode('date');
         setTargetDate(pot.target_date);
@@ -176,8 +180,9 @@ function GoalModal({
       setBlendMonths('12');
       setTargetDate('');
       setColor(POT_COLORS[0]);
+      setCurrentValue('');
     }
-  }, [open, pot]);
+  }, [open, pot, totalSaved]);
 
   if (!open) return null;
 
@@ -204,10 +209,19 @@ function GoalModal({
     });
     if (res.ok) {
       const saved: Pot = await res.json();
-      onSave(saved);
+      const newAmount = currentValue !== '' ? parseFloat(currentValue) || 0 : undefined;
+      if (newAmount !== undefined) {
+        await fetch('/api/payday/savings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: saved.id, currentBalance: newAmount }),
+        });
+      }
+      onSave(saved, newAmount);
       onClose();
+    } else {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   const ownerOptions: { value: 'person_a' | 'person_b' | 'joint'; label: string }[] = [
@@ -299,6 +313,16 @@ function GoalModal({
                   className={`w-7 h-7 rounded-full transition-all ${color === c ? 'ring-2 ring-offset-2 ring-[#396940]' : ''}`}
                   style={{ background: c }} />
               ))}
+            </div>
+          </div>
+
+          {/* Current saved */}
+          <div>
+            <p className={LABEL_CLS}>Current saved (optional)</p>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-[#717970]">£</span>
+              <input type="number" value={currentValue} onChange={e => setCurrentValue(e.target.value)}
+                placeholder="0.00" className={INPUT_CLS + ' pl-8'} />
             </div>
           </div>
         </div>
@@ -560,10 +584,12 @@ function GoalCard({
   pot,
   totalSaved,
   onEdit,
+  onDelete,
 }: {
   pot: Pot;
   totalSaved: number;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
   const target = pot.target_amount ?? 0;
   const pct = target > 0 ? Math.min(100, Math.round((totalSaved / target) * 100)) : 0;
@@ -578,9 +604,14 @@ function GoalCard({
           />
           <span className="font-semibold text-[#1a2b1a] text-sm">{pot.name}</span>
         </div>
-        <button onClick={onEdit} className="text-[#9ba99a] hover:text-[#396940] transition-colors p-1">
-          <PencilIcon />
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={onEdit} className="text-[#9ba99a] hover:text-[#396940] transition-colors p-1">
+            <PencilIcon />
+          </button>
+          <button onClick={onDelete} className="text-[#9ba99a] hover:text-[#ba1a1a] transition-colors p-1">
+            <TrashIcon />
+          </button>
+        </div>
       </div>
 
       {pot.target_months != null && (
@@ -632,11 +663,13 @@ function WealthCard({
   lastPayday,
   onBalanceUpdate,
   onEdit,
+  onDelete,
 }: {
   pot: Pot;
   lastPayday: number;
   onBalanceUpdate: (id: string, balance: number) => void;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState(String(pot.current_balance ?? 0));
@@ -678,9 +711,14 @@ function WealthCard({
               Last payday: £{fmt(lastPayday)}
             </span>
           )}
-          <button onClick={onEdit} className="text-[#9ba99a] hover:text-[#396940] transition-colors p-1">
-            <PencilIcon />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={onEdit} className="text-[#9ba99a] hover:text-[#396940] transition-colors p-1">
+              <PencilIcon />
+            </button>
+            <button onClick={onDelete} className="text-[#9ba99a] hover:text-[#ba1a1a] transition-colors p-1">
+              <TrashIcon />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -866,13 +904,6 @@ function WealthTableRow({ pot, lastPayday, onBalanceUpdate, ownerInitial, onEdit
       </td>
       <td className="py-4 px-2 text-sm text-[#414940] font-medium">{pot.provider ?? pot.name}</td>
       <td className="py-4 px-2">
-        {lastPayday > 0 && (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-[#e8f5e9] text-[#2e7d32]">
-            Last payday: £{lastPayday.toLocaleString('en-GB')}
-          </span>
-        )}
-      </td>
-      <td className="py-4 px-2">
         {editing ? (
           <div className="flex items-center gap-1">
             <span className="text-[#396940] font-bold text-sm">£</span>
@@ -938,11 +969,14 @@ export default function SavingsPage() {
     setPots(prev => prev.map(p => p.id === id ? { ...p, current_balance: balance } : p));
   }
 
-  function handleGoalSave(saved: Pot) {
+  function handleGoalSave(saved: Pot, savedAmount?: number) {
     setPots(prev => {
       const exists = prev.find(p => p.id === saved.id);
       return exists ? prev.map(p => p.id === saved.id ? saved : p) : [...prev, saved];
     });
+    if (savedAmount !== undefined) {
+      setSavingsMap(prev => ({ ...prev, [saved.id]: savedAmount }));
+    }
   }
 
   function handleInvestSave(saved: Pot) {
@@ -1013,6 +1047,7 @@ export default function SavingsPage() {
             open={goalModal.open}
             pot={goalModal.pot}
             household={household}
+            totalSaved={goalModal.pot ? (savingsMap[goalModal.pot.id] ?? 0) : 0}
             onClose={() => setGoalModal({ open: false, pot: null })}
             onSave={handleGoalSave}
           />
@@ -1102,7 +1137,8 @@ export default function SavingsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {thisMonth.map(pot => (
                       <GoalCard key={pot.id} pot={pot} totalSaved={savingsMap[pot.id] ?? 0}
-                        onEdit={() => setGoalModal({ open: true, pot })} />
+                        onEdit={() => setGoalModal({ open: true, pot })}
+                        onDelete={() => setDeleteModal({ open: true, pot })} />
                     ))}
                   </div>
                 </div>
@@ -1113,7 +1149,8 @@ export default function SavingsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {comingUp.map(pot => (
                       <GoalCard key={pot.id} pot={pot} totalSaved={savingsMap[pot.id] ?? 0}
-                        onEdit={() => setGoalModal({ open: true, pot })} />
+                        onEdit={() => setGoalModal({ open: true, pot })}
+                        onDelete={() => setDeleteModal({ open: true, pot })} />
                     ))}
                   </div>
                 </div>
@@ -1194,7 +1231,8 @@ export default function SavingsPage() {
                       {ownerPots.map(pot => (
                         <WealthCard key={pot.id} pot={pot} lastPayday={savingsMap[pot.id] ?? 0}
                           onBalanceUpdate={handleBalanceUpdate}
-                          onEdit={() => setInvestModal({ open: true, pot })} />
+                          onEdit={() => setInvestModal({ open: true, pot })}
+                          onDelete={() => setDeleteModal({ open: true, pot })} />
                       ))}
                     </div>
                   </div>
@@ -1213,7 +1251,6 @@ export default function SavingsPage() {
                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#717970] uppercase tracking-wide">Owner</th>
                     <th className="text-left py-3 px-2 text-xs font-semibold text-[#717970] uppercase tracking-wide">Product Name</th>
                     <th className="text-left py-3 px-2 text-xs font-semibold text-[#717970] uppercase tracking-wide">Provider</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-[#717970] uppercase tracking-wide">Activity</th>
                     <th className="text-left py-3 px-2 text-xs font-semibold text-[#717970] uppercase tracking-wide">Current Balance</th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#717970] uppercase tracking-wide">Actions</th>
                   </tr>
@@ -1226,7 +1263,7 @@ export default function SavingsPage() {
                       onDelete={() => setDeleteModal({ open: true, pot })} />
                   ))}
                   {filteredLong.length === 0 && (
-                    <tr><td colSpan={6} className="py-8 text-center text-sm text-[#9ba99a]">No investments yet.</td></tr>
+                    <tr><td colSpan={5} className="py-8 text-center text-sm text-[#9ba99a]">No investments yet.</td></tr>
                   )}
                 </tbody>
               </table>
