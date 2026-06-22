@@ -481,6 +481,35 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
 
 // ── Sub-components defined OUTSIDE InlineEdit to prevent remount on render ──
 
+function JointPotRow({ p, amount, splitA, splitB, nameA, nameB, onAmountChange }: {
+  p: Pot; amount: string; splitA: number; splitB: number; nameA: string; nameB: string;
+  onAmountChange: (v: string) => void;
+}) {
+  const total = parseFloat(amount) || 0;
+  const shareA = total * (splitA / 100);
+  const shareB = total * (splitB / 100);
+  return (
+    <div className="bg-[#f1f4f2] rounded-xl px-3 py-2.5 space-y-1.5">
+      <div className="flex items-center gap-2">
+        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
+        <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">{p.name}</span>
+        <div className="relative w-28 shrink-0">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">£</span>
+          <input type="number" min="0" value={amount} onChange={e=>onAmountChange(e.target.value)} placeholder="0"
+            className="w-full pl-6 pr-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
+        </div>
+      </div>
+      {total > 0 && (
+        <div className="flex gap-3 pl-4 text-xs text-[#9aaa98]">
+          <span>{nameA}: {fmt(shareA)}</span>
+          <span>·</span>
+          <span>{nameB}: {fmt(shareB)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function potRec(pot: Pot, monthly: number, available: number): string {
   if (available <= 0) return '';
   if (monthly <= 0) {
@@ -579,7 +608,7 @@ function AddBtn({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b'; onAdd: (owner: 'person_a'|'person_b', potType: 'short_term'|'long_term', name: string) => Promise<void> }) {
+function AddPotRow({ owner, onAdd }: { owner: 'person_a' | 'person_b' | 'joint'; onAdd: (owner: 'person_a'|'person_b'|'joint', potType: 'short_term'|'long_term', name: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState<'short_term'|'long_term'>('short_term');
@@ -649,6 +678,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const [travelB, setTravelB] = useState('');
   const [percentsA, setPercentsA] = useState<Record<string,string>>({});
   const [percentsB, setPercentsB] = useState<Record<string,string>>({});
+  const [jointPotAmounts, setJointPotAmounts] = useState<Record<string,string>>({});
   const [inputModeA, setInputModeA] = useState<Record<string,'pct'|'gbp'>>({});
   const [inputModeB, setInputModeB] = useState<Record<string,'pct'|'gbp'>>({});
   const [saving, setSaving] = useState(false);
@@ -684,8 +714,14 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       const dPB = detail.bills.filter(b=>['individual_b','debt_b'].includes(b.category)).reduce((s,b)=>s+Number(b.amount),0)+Number(s.spending_b)+Number(s.travel_b);
       const dAvA = Number(s.income_a)-(dJF*splitA/100)-dExA-dPA;
       const dAvB = Number(s.income_b)-(dJF*splitB/100)-dExB-dPB;
-      if (dAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a'||pot?.owner==='joint')pa[a.pot_id]=String(Math.round(Number(a.amount)/dAvA*100));});
-      if (dAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dAvB*100));});
+      const ja: Record<string,string> = {};
+      allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='joint')ja[a.pot_id]=String(Number(a.amount));});
+      const dJointSavA = pots.filter(p=>p.owner==='joint').reduce((s,p)=>s+(parseFloat(ja[p.id])||0)*(splitA/100),0);
+      const dJointSavB = pots.filter(p=>p.owner==='joint').reduce((s,p)=>s+(parseFloat(ja[p.id])||0)*(splitB/100),0);
+      const dPerAvA = dAvA - dJointSavA; const dPerAvB = dAvB - dJointSavB;
+      setJointPotAmounts(ja);
+      if (dPerAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvA*100));});
+      if (dPerAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvB*100));});
     } else {
       const src = latestLockedDetail;
       if (src) {
@@ -709,8 +745,14 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
         const dPB = src.bills.filter(b=>['individual_b','debt_b'].includes(b.category)).reduce((s,b)=>s+Number(b.amount),0)+Number(s.spending_b)+Number(s.travel_b);
         const dAvA = Number(s.income_a)-(dJF*splitA/100)-dExA-dPA;
         const dAvB = Number(s.income_b)-(dJF*splitB/100)-dExB-dPB;
-        if (dAvA > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a'||pot?.owner==='joint')pa[a.pot_id]=String(Math.round(Number(a.amount)/dAvA*100));});
-        if (dAvB > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dAvB*100));});
+        const ja2: Record<string,string> = {};
+        allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='joint')ja2[a.pot_id]=String(Number(a.amount));});
+        const dJointSavA2 = pots.filter(p=>p.owner==='joint').reduce((s,p)=>s+(parseFloat(ja2[p.id])||0)*(splitA/100),0);
+        const dJointSavB2 = pots.filter(p=>p.owner==='joint').reduce((s,p)=>s+(parseFloat(ja2[p.id])||0)*(splitB/100),0);
+        const dPerAvA2 = dAvA - dJointSavA2; const dPerAvB2 = dAvB - dJointSavB2;
+        setJointPotAmounts(ja2);
+        if (dPerAvA2 > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_a')pa[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvA2*100));});
+        if (dPerAvB2 > 0) allocs.forEach(a=>{const pot=pots.find(p=>p.id===a.pot_id);if(pot?.owner==='person_b')pb[a.pot_id]=String(Math.round(Number(a.amount)/dPerAvB2*100));});
       } else {
         if (mostRecentSession) {
           setIncomeA(mostRecentSession.income_a > 0 ? String(mostRecentSession.income_a) : '');
@@ -742,22 +784,25 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const extrasForB = extras.reduce((s,e)=>{const a=parseFloat(e.amount)||0;return e.who==='b'?s+a:e.who==='both'?s+a*(splitB/100):s;},0);
   const personalTotalA = billsA.reduce((s,b)=>s+(parseFloat(b.amount)||0),0)+debtsA.reduce((s,d)=>s+(parseFloat(d.amount)||0),0)+(parseFloat(spendingA)||0)+(parseFloat(travelA)||0);
   const personalTotalB = billsB.reduce((s,b)=>s+(parseFloat(b.amount)||0),0)+debtsB.reduce((s,d)=>s+(parseFloat(d.amount)||0),0)+(parseFloat(spendingB)||0)+(parseFloat(travelB)||0);
-  const availableA = iA-(jointTotal*splitA/100)-extrasForA-personalTotalA;
-  const availableB = iB-(jointTotal*splitB/100)-extrasForB-personalTotalB;
   const jointContribA = jointTotal*(splitA/100)+extrasForA;
   const jointContribB = jointTotal*(splitB/100)+extrasForB;
 
-  const potsA = pots.filter(p=>p.owner==='person_a'||p.owner==='joint');
-  const potsB = pots.filter(p=>p.owner==='person_b');
+  const potsJoint = pots.filter(p=>p.owner==='joint');
+  const potsPersonA = pots.filter(p=>p.owner==='person_a');
+  const potsPersonB = pots.filter(p=>p.owner==='person_b');
+  const jointSavForA = potsJoint.reduce((s,p)=>s+(parseFloat(jointPotAmounts[p.id])||0)*(splitA/100),0);
+  const jointSavForB = potsJoint.reduce((s,p)=>s+(parseFloat(jointPotAmounts[p.id])||0)*(splitB/100),0);
+  const availableA = iA-(jointTotal*splitA/100)-extrasForA-personalTotalA-jointSavForA;
+  const availableB = iB-(jointTotal*splitB/100)-extrasForB-personalTotalB-jointSavForB;
   const potAmountA = (id: string) => availableA*((parseFloat(percentsA[id])||0)/100);
   const potAmountB = (id: string) => availableB*((parseFloat(percentsB[id])||0)/100);
-  const allocPctA = potsA.reduce((s,p)=>s+(parseFloat(percentsA[p.id])||0),0);
-  const allocPctB = potsB.reduce((s,p)=>s+(parseFloat(percentsB[p.id])||0),0);
-  const aReady = Math.abs(100-allocPctA)<0.01;
-  const bReady = !isPartner||Math.abs(100-allocPctB)<0.01;
+  const allocPctA = potsPersonA.reduce((s,p)=>s+(parseFloat(percentsA[p.id])||0),0);
+  const allocPctB = potsPersonB.reduce((s,p)=>s+(parseFloat(percentsB[p.id])||0),0);
+  const aReady = potsPersonA.length===0||Math.abs(100-allocPctA)<0.01;
+  const bReady = !isPartner||(potsPersonB.length===0||Math.abs(100-allocPctB)<0.01);
   const canLock = aReady&&bReady&&availableA>=0&&(!isPartner||availableB>=0);
-  const totalSavingsA = potsA.reduce((s,p)=>s+potAmountA(p.id),0);
-  const totalSavingsB = potsB.reduce((s,p)=>s+potAmountB(p.id),0);
+  const totalSavingsA = potsPersonA.reduce((s,p)=>s+potAmountA(p.id),0)+jointSavForA;
+  const totalSavingsB = potsPersonB.reduce((s,p)=>s+potAmountB(p.id),0)+jointSavForB;
   const totalJointAllExtras = jointTotal + extras.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
 
   async function persist(lock: boolean) {
@@ -771,8 +816,9 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       ...debtsB.filter(d=>d.name).map(d=>({ name:d.name, amount:parseFloat(d.amount)||0, category:'debt_b' })),
     ];
     const allocMap: Record<string,number> = {};
-    potsA.forEach(p=>{const amt=potAmountA(p.id);if(amt>0)allocMap[p.id]=(allocMap[p.id]??0)+amt;});
-    potsB.forEach(p=>{const amt=potAmountB(p.id);if(amt>0)allocMap[p.id]=(allocMap[p.id]??0)+amt;});
+    potsJoint.forEach(p=>{const amt=parseFloat(jointPotAmounts[p.id])||0;if(amt>0)allocMap[p.id]=amt;});
+    potsPersonA.forEach(p=>{const amt=potAmountA(p.id);if(amt>0)allocMap[p.id]=amt;});
+    potsPersonB.forEach(p=>{const amt=potAmountB(p.id);if(amt>0)allocMap[p.id]=amt;});
     const allAllocs = Object.entries(allocMap).map(([potId,amount])=>({potId,amount}));
     const payload = { householdId:hh.id, date:`${month}-01`, incomeA:iA, incomeB:iB, startingBalance:0, spendingA:parseFloat(spendingA)||0, spendingB:parseFloat(spendingB)||0, travelA:parseFloat(travelA)||0, travelB:parseFloat(travelB)||0, bills:allBills, allocations:allAllocs, lock };
     let savedId = sessionId;
@@ -789,7 +835,7 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
     else if (savedId) { setSaved(true); setTimeout(()=>setSaved(false),2000); onSaved(); }
   }
 
-  async function addPot(owner: 'person_a' | 'person_b', potType: 'short_term' | 'long_term', name: string) {
+  async function addPot(owner: 'person_a' | 'person_b' | 'joint', potType: 'short_term' | 'long_term', name: string) {
     const colors = ['#7bae7f','#f4a261','#e9c46a','#3b82f6','#8b5cf6','#14b8a6','#f97316','#6366f1'];
     const color = colors[pots.length % colors.length];
     const res = await fetch('/api/payday/pots', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ householdId:hh.id, name, owner, potType, color, sortOrder:pots.length }) });
@@ -975,6 +1021,35 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       {/* ── Savings ── */}
       <div className="space-y-3">
         <h2 className="text-lg font-bold text-[#181c1c] flex items-center gap-2"><span>🏦</span> Savings</h2>
+
+        {/* Joint savings — shown above personal when partner mode has joint pots */}
+        {isPartner && potsJoint.length > 0 && (
+          <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)]">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2"><span>🤝</span><span className="font-bold text-[#181c1c]">Joint savings</span></div>
+              <span className="text-xs text-[#717970] font-medium">Split {splitA}/{splitB}</span>
+            </div>
+            <div className="space-y-2">
+              {potsJoint.filter(p=>p.pot_type==='short_term').length>0 && <SLabel>Short-term goals</SLabel>}
+              {potsJoint.filter(p=>p.pot_type==='short_term').map(p => (
+                <JointPotRow key={p.id} p={p} amount={jointPotAmounts[p.id]??''} splitA={splitA} splitB={splitB}
+                  nameA={hh.person_a_name} nameB={hh.person_b_name}
+                  onAmountChange={v=>setJointPotAmounts(prev=>({...prev,[p.id]:v}))} />
+              ))}
+              {potsJoint.filter(p=>p.pot_type!=='short_term').length>0 && <SLabel>Long-term savings</SLabel>}
+              {potsJoint.filter(p=>p.pot_type!=='short_term').map(p => (
+                <JointPotRow key={p.id} p={p} amount={jointPotAmounts[p.id]??''} splitA={splitA} splitB={splitB}
+                  nameA={hh.person_a_name} nameB={hh.person_b_name}
+                  onAmountChange={v=>setJointPotAmounts(prev=>({...prev,[p.id]:v}))} />
+              ))}
+            </div>
+            <AddPotRow owner="joint" onAdd={addPot} />
+            <div className="text-xs mt-3 text-[#9aaa98]">
+              Joint contributions are deducted from each person&apos;s available before personal savings.
+            </div>
+          </div>
+        )}
+
         <div className={isPartner ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : ''}>
           <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)]">
             <div className="flex items-center justify-between mb-4">
@@ -982,15 +1057,15 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               <span className="text-xs text-[#717970] font-medium">Available: {fmt(availableA)}</span>
             </div>
             <div className="space-y-2">
-              {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).length>0 && <SLabel>Short-term goals</SLabel>}
-              {pots.filter(p=>p.pot_type==='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => (
+              {potsPersonA.filter(p=>p.pot_type==='short_term').length>0 && <SLabel>Short-term goals</SLabel>}
+              {potsPersonA.filter(p=>p.pot_type==='short_term').map(p => (
                 <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0} available={availableA}
                   onPctChange={v=>setPercentsA(prev=>({...prev,[p.id]:v}))}
                   inputMode={inputModeA[p.id]??'pct'}
                   onToggleMode={()=>setInputModeA(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
               ))}
-              {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).length>0 && <SLabel>Long-term savings</SLabel>}
-              {pots.filter(p=>p.pot_type!=='short_term'&&(p.owner==='person_a'||p.owner==='joint')).map(p => (
+              {potsPersonA.filter(p=>p.pot_type!=='short_term').length>0 && <SLabel>Long-term savings</SLabel>}
+              {potsPersonA.filter(p=>p.pot_type!=='short_term').map(p => (
                 <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0} available={availableA}
                   onPctChange={v=>setPercentsA(prev=>({...prev,[p.id]:v}))}
                   inputMode={inputModeA[p.id]??'pct'}
@@ -998,10 +1073,12 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               ))}
             </div>
             <AddPotRow owner="person_a" onAdd={addPot} />
-            <div className={`flex justify-between text-xs mt-3 font-bold ${aReady?'text-[#396940]':'text-[#717970]'}`}>
-              <span>{Math.round(allocPctA)}% allocated</span>
-              <span>{aReady?'✓ All allocated':`${(100-allocPctA).toFixed(0)}% remaining`}</span>
-            </div>
+            {potsPersonA.length > 0 && (
+              <div className={`flex justify-between text-xs mt-3 font-bold ${aReady?'text-[#396940]':'text-[#717970]'}`}>
+                <span>{Math.round(allocPctA)}% allocated</span>
+                <span>{aReady?'✓ All allocated':`${(100-allocPctA).toFixed(0)}% remaining`}</span>
+              </div>
+            )}
           </div>
 
           {isPartner && (
@@ -1011,15 +1088,15 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 <span className="text-xs text-[#717970] font-medium">Available: {fmt(availableB)}</span>
               </div>
               <div className="space-y-2">
-                {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_b').length>0 && <SLabel>Short-term goals</SLabel>}
-                {pots.filter(p=>p.pot_type==='short_term'&&p.owner==='person_b').map(p => (
+                {potsPersonB.filter(p=>p.pot_type==='short_term').length>0 && <SLabel>Short-term goals</SLabel>}
+                {potsPersonB.filter(p=>p.pot_type==='short_term').map(p => (
                   <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0} available={availableB}
                     onPctChange={v=>setPercentsB(prev=>({...prev,[p.id]:v}))}
                     inputMode={inputModeB[p.id]??'pct'}
                     onToggleMode={()=>setInputModeB(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
                 ))}
-                {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_b').length>0 && <SLabel>Long-term savings</SLabel>}
-                {pots.filter(p=>p.pot_type!=='short_term'&&p.owner==='person_b').map(p => (
+                {potsPersonB.filter(p=>p.pot_type!=='short_term').length>0 && <SLabel>Long-term savings</SLabel>}
+                {potsPersonB.filter(p=>p.pot_type!=='short_term').map(p => (
                   <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0} available={availableB}
                     onPctChange={v=>setPercentsB(prev=>({...prev,[p.id]:v}))}
                     inputMode={inputModeB[p.id]??'pct'}
@@ -1027,10 +1104,12 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
                 ))}
               </div>
               <AddPotRow owner="person_b" onAdd={addPot} />
-              <div className={`flex justify-between text-xs mt-3 font-bold ${bReady?'text-[#396940]':'text-[#717970]'}`}>
-                <span>{Math.round(allocPctB)}% allocated</span>
-                <span>{bReady?'✓ All allocated':`${(100-allocPctB).toFixed(0)}% remaining`}</span>
-              </div>
+              {potsPersonB.length > 0 && (
+                <div className={`flex justify-between text-xs mt-3 font-bold ${bReady?'text-[#396940]':'text-[#717970]'}`}>
+                  <span>{Math.round(allocPctB)}% allocated</span>
+                  <span>{bReady?'✓ All allocated':`${(100-allocPctB).toFixed(0)}% remaining`}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1061,11 +1140,11 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       {/* ── Sticky footer ── */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#f7faf8]/95 backdrop-blur-sm border-t border-[#e6e9e7] px-5 py-4">
         <div className="max-w-3xl mx-auto space-y-2">
-          {!canLock && (aReady===false||bReady===false) && (
+          {!canLock && (!aReady||!bReady) && (
             <div className="text-xs text-[#8e4e14] text-center font-medium">
-              {!aReady && <span>{hh.person_a_name}: {(100-allocPctA).toFixed(0)}% still to allocate</span>}
-              {isPartner&&!bReady&&!aReady && <span> · </span>}
-              {isPartner&&!bReady && <span>{hh.person_b_name}: {(100-allocPctB).toFixed(0)}% still to allocate</span>}
+              {!aReady && potsPersonA.length>0 && <span>{hh.person_a_name}: {(100-allocPctA).toFixed(0)}% personal still to allocate</span>}
+              {isPartner&&!bReady&&!aReady && potsPersonA.length>0 && potsPersonB.length>0 && <span> · </span>}
+              {isPartner&&!bReady && potsPersonB.length>0 && <span>{hh.person_b_name}: {(100-allocPctB).toFixed(0)}% personal still to allocate</span>}
             </div>
           )}
           <div className="flex gap-3">
