@@ -887,7 +887,11 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
                   {pots.map(p => {
                     const asPotDraft: PotDraft = { id: p.localId, name: p.name, targetAmount: p.targetAmount, targetMonths: p.targetMonths, color: p.color, owner: p.owner, potType: 'short_term', targetMode: p.targetMode, targetDate: p.targetDate };
                     return (
-                      <ShortTermPotRow key={p.localId} pot={asPotDraft} paydayDay={hh.payday_day}
+                      <ShortTermPotRow key={p.localId} pot={asPotDraft} paydayDay={
+                        p.owner === 'person_b' ? (hh.payday_day_b ?? hh.payday_day)
+                        : p.owner === 'joint' ? Math.min(hh.payday_day, hh.payday_day_b ?? hh.payday_day)
+                        : hh.payday_day
+                      }
                         onUpdate={patch => setShortPots(l => l.map(x => x.localId === p.localId ? { ...x, ...patch } : x))}
                         onRemove={() => setShortPots(l => l.map(x => x.localId === p.localId ? { ...x, deleted: true } : x))} />
                     );

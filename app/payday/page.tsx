@@ -12,7 +12,7 @@ interface Household {
   joint_split_a: number;
   default_spending_a: number; default_spending_b: number;
   default_transport_a: number; default_transport_b: number;
-  payday_day: number;
+  payday_day: number; payday_day_b?: number;
 }
 interface SessionSummary {
   id: string; date: string; locked_at: string | null;
@@ -142,15 +142,25 @@ export default function PaydayHome() {
   const isPartner = hh.mode === 'partner';
   const curYM = toYM(new Date());
   const paydayDay = hh.payday_day ?? 25;
+  const paydayDayB = hh.payday_day_b ?? paydayDay;
   const now = new Date();
-  // Has this month's payday happened yet?
-  const paydayThisMonth = new Date(now.getFullYear(), now.getMonth(), paydayDay);
-  const paydayNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, paydayDay);
-  const nextPaydayDate = now < paydayThisMonth ? paydayThisMonth : paydayNextMonth;
-  const daysUntilNextPayday = Math.ceil((nextPaydayDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  // Has today passed the payday day in the selected month?
+  // Compute next-payday date for each person
+  function nextPaydayFor(day: number) {
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), day);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, day);
+    return now < thisMonth ? thisMonth : nextMonth;
+  }
+  const nextPaydayDateA = nextPaydayFor(paydayDay);
+  const nextPaydayDateB = nextPaydayFor(paydayDayB);
+  const daysUntilA = Math.ceil((nextPaydayDateA.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const daysUntilB = Math.ceil((nextPaydayDateB.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  // For onboarding tooltip and any single-value references, use the earlier of the two
+  const daysUntilNextPayday = Math.min(daysUntilA, daysUntilB);
+  const showTwoPills = isPartner && paydayDayB !== paydayDay;
+  // Has today passed the payday day in the selected month? Use earliest payday.
   const [selY, selM] = selectedMonth.split('-').map(Number);
-  const selectedMonthPayday = new Date(selY, selM - 1, paydayDay);
+  const earliestPaydayDay = Math.min(paydayDay, paydayDayB);
+  const selectedMonthPayday = new Date(selY, selM - 1, earliestPaydayDay);
   const paydayHasPassed = now >= selectedMonthPayday;
   // The spend month is the month AFTER the payday month (e.g. paid Jun 25 → spending July)
   const spendMonthLabel = new Date(selY, selM, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -239,11 +249,24 @@ export default function PaydayHome() {
               </button>
             );
           })}
-          {/* Countdown pill */}
-          <div className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-white border border-[#c1c9be] text-[#414940] whitespace-nowrap">
-            <span>📅</span>
-            <span>{daysUntilNextPayday === 0 ? 'Payday today! 🎉' : `${daysUntilNextPayday} days until payday`}</span>
-          </div>
+          {/* Countdown pill(s) */}
+          {showTwoPills ? (
+            <>
+              <div className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-white border border-[#c1c9be] text-[#414940] whitespace-nowrap">
+                <span>📅</span>
+                <span>{daysUntilA === 0 ? `${hh.person_a_name}: payday today! 🎉` : `${hh.person_a_name}: ${daysUntilA}d`}</span>
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-white border border-[#c1c9be] text-[#414940] whitespace-nowrap">
+                <span>📅</span>
+                <span>{daysUntilB === 0 ? `${hh.person_b_name}: payday today! 🎉` : `${hh.person_b_name}: ${daysUntilB}d`}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-white border border-[#c1c9be] text-[#414940] whitespace-nowrap">
+              <span>📅</span>
+              <span>{daysUntilNextPayday === 0 ? 'Payday today! 🎉' : `${daysUntilNextPayday} days until payday`}</span>
+            </div>
+          )}
         </div>
 
         <div className="pb-10 space-y-8">

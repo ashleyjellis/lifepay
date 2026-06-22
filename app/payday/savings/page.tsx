@@ -19,7 +19,7 @@ interface Household {
   mode: 'solo' | 'partner';
   person_a_name: string;
   person_b_name: string;
-  payday_day: number;
+  payday_day: number; payday_day_b?: number;
 }
 
 interface Pot {
@@ -266,7 +266,11 @@ function GoalModal({
                 </select>
                 {targetDate && (
                   <p className="mt-2 text-xs text-[#396940] bg-[#e8f5e9] rounded-xl px-3 py-2">
-                    {formatTargetDateCallout(targetDate, household.payday_day || 1)}
+                    {formatTargetDateCallout(targetDate,
+                      owner === 'person_b' ? (household.payday_day_b ?? household.payday_day) || 1
+                      : owner === 'joint' ? Math.min(household.payday_day, household.payday_day_b ?? household.payday_day) || 1
+                      : household.payday_day || 1
+                    )}
                   </p>
                 )}
               </div>
