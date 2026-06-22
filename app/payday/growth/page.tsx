@@ -96,6 +96,7 @@ export default function GrowthPage() {
   const [saving, setSaving] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [filterOwner, setFilterOwner] = useState<'all' | 'person_a' | 'person_b' | 'joint'>('all');
 
   // Load household + pots
   useEffect(() => {
@@ -272,6 +273,15 @@ export default function GrowthPage() {
 
   const years = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
 
+  const filterPills: { key: 'all' | 'person_a' | 'person_b' | 'joint'; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'person_a', label: household?.person_a_name ?? 'Person A' },
+    ...(household?.mode === 'partner' ? [{ key: 'person_b' as const, label: household?.person_b_name ?? 'Person B' }] : []),
+    { key: 'joint', label: 'Joint' },
+  ];
+
+  const displayPots = filterOwner === 'all' ? pots : pots.filter(p => p.owner === filterOwner);
+
   return (
     <div className={`min-h-screen bg-[#f7faf8] ${quicksand.className}`}>
       {/* Header */}
@@ -356,6 +366,20 @@ export default function GrowthPage() {
           </div>
         )}
 
+        {/* Owner filter pills */}
+        {pots.length > 0 && (
+          <div className="flex gap-2 flex-wrap mb-5">
+            {filterPills.map(pill => (
+              <button key={pill.key} onClick={() => setFilterOwner(pill.key)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  filterOwner === pill.key ? 'bg-[#396940] text-white' : 'bg-white border border-[#c1c9be] text-[#414940] hover:border-[#396940]'
+                }`}>
+                {pill.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Empty state */}
         {pots.length === 0 ? (
           <div className="bg-white rounded-2xl border border-[#e6e9e7] p-10 text-center">
@@ -381,7 +405,7 @@ export default function GrowthPage() {
                 </tr>
               </thead>
               <tbody>
-                {pots.map(pot => {
+                {displayPots.map(pot => {
                   const row = rows[pot.id] ?? { startBalance: '0', moneyIn: '0', transferOut: '0', endBalance: '0' };
                   const end = parseFloat(row.endBalance) || 0;
                   const start = parseFloat(row.startBalance) || 0;
