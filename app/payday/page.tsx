@@ -481,6 +481,60 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
 
 // ── Sub-components defined OUTSIDE InlineEdit to prevent remount on render ──
 
+function potRec(pot: Pot, monthly: number, available: number): string {
+  if (available <= 0) return '';
+  if (monthly <= 0) {
+    const suggest = Math.round(available * 0.1);
+    return `Nothing allocated yet — 10% would be £${suggest}/mo`;
+  }
+  if (pot.target_amount && pot.target_amount > 0) {
+    const months = Math.ceil(pot.target_amount / monthly);
+    return `£${Math.round(monthly)}/mo → goal in ~${months} month${months === 1 ? '' : 's'}`;
+  }
+  return `£${Math.round(monthly)} allocated this month`;
+}
+
+function PotRow({ p, pct, available, onPctChange, inputMode, onToggleMode }: {
+  p: Pot; pct: number; available: number;
+  onPctChange: (val: string) => void;
+  inputMode: 'pct' | 'gbp';
+  onToggleMode: () => void;
+}) {
+  const amount = available * (pct / 100);
+  const isGbp = inputMode === 'gbp';
+  const displayVal = isGbp ? (amount > 0 ? amount.toFixed(0) : '') : (pct > 0 ? String(pct) : '');
+  function handleChange(raw: string) {
+    const v = parseFloat(raw) || 0;
+    if (isGbp) {
+      onPctChange(available > 0 ? String(Math.min(100, (v / available) * 100)) : '0');
+    } else {
+      onPctChange(raw);
+    }
+  }
+  const rec = p.pot_type === 'short_term' ? potRec(p, amount, available) : '';
+  return (
+    <div className="bg-[#f1f4f2] rounded-xl px-3 py-2.5 space-y-1">
+      <div className="flex items-center gap-2">
+        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
+        <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">
+          {p.name}
+          {p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}
+        </span>
+        <button onClick={onToggleMode} className="text-xs px-1.5 py-0.5 rounded-md border border-[#c1c9be] text-[#717970] hover:border-[#7bae7f] hover:text-[#396940] font-bold transition-colors shrink-0">
+          {isGbp ? '£' : '%'}
+        </button>
+        <div className="relative w-20 shrink-0">
+          <input type="number" min="0" value={displayVal} onChange={e=>handleChange(e.target.value)} placeholder="0"
+            className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">{isGbp ? '£' : '%'}</span>
+        </div>
+        <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{isGbp ? (pct > 0 ? `${Math.round(pct)}%` : '—') : (amount > 0 ? fmt(amount) : '—')}</span>
+      </div>
+      {rec && <div className="text-xs text-[#9aaa98] pl-4">{rec}</div>}
+    </div>
+  );
+}
+
 interface EditBill { _key: string; name: string; amount: string; }
 interface EditExtra { _key: string; name: string; amount: string; who: 'both' | 'a' | 'b'; }
 
@@ -750,60 +804,6 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   }
 
   const whoLabel = (who: 'both'|'a'|'b') => who==='both'?'Both':who==='a'?hh.person_a_name:hh.person_b_name;
-
-  function potRec(pot: Pot, monthly: number, available: number): string {
-    if (available <= 0) return '';
-    if (monthly <= 0) {
-      const suggest = Math.round(available * 0.1);
-      return `Nothing allocated yet — 10% would be £${suggest}/mo`;
-    }
-    if (pot.target_amount && pot.target_amount > 0) {
-      const months = Math.ceil(pot.target_amount / monthly);
-      return `£${Math.round(monthly)}/mo → goal in ~${months} month${months === 1 ? '' : 's'}`;
-    }
-    return `£${Math.round(monthly)} allocated this month`;
-  }
-
-  function PotRow({ p, pct, available, onPctChange, inputMode, onToggleMode }: {
-    p: Pot; pct: number; available: number;
-    onPctChange: (val: string) => void;
-    inputMode: 'pct' | 'gbp';
-    onToggleMode: () => void;
-  }) {
-    const amount = available * (pct / 100);
-    const isGbp = inputMode === 'gbp';
-    const displayVal = isGbp ? (amount > 0 ? amount.toFixed(0) : '') : (pct > 0 ? String(pct) : '');
-    function handleChange(raw: string) {
-      const v = parseFloat(raw) || 0;
-      if (isGbp) {
-        onPctChange(available > 0 ? String(Math.min(100, (v / available) * 100)) : '0');
-      } else {
-        onPctChange(raw);
-      }
-    }
-    const rec = p.pot_type === 'short_term' ? potRec(p, amount, available) : '';
-    return (
-      <div className="bg-[#f1f4f2] rounded-xl px-3 py-2.5 space-y-1">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-          <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">
-            {p.name}
-            {p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}
-          </span>
-          <button onClick={onToggleMode} className="text-xs px-1.5 py-0.5 rounded-md border border-[#c1c9be] text-[#717970] hover:border-[#7bae7f] hover:text-[#396940] font-bold transition-colors shrink-0">
-            {isGbp ? '£' : '%'}
-          </button>
-          <div className="relative w-20 shrink-0">
-            <input type="number" min="0" value={displayVal} onChange={e=>handleChange(e.target.value)} placeholder="0"
-              className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">{isGbp ? '£' : '%'}</span>
-          </div>
-          <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{isGbp ? (pct > 0 ? `${Math.round(pct)}%` : '—') : (amount > 0 ? fmt(amount) : '—')}</span>
-        </div>
-        {rec && <div className="text-xs text-[#9aaa98] pl-4">{rec}</div>}
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
