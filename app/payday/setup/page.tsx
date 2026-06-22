@@ -38,6 +38,7 @@ interface HouseholdRow {
   joint_split_a: number; payday_day: number; payday_day_b: number;
   default_spending_a: number; default_spending_b: number;
   default_transport_a: number; default_transport_b: number;
+  onboarding_step?: string | null;
 }
 
 const POT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#14b8a6','#64748b'];
@@ -960,37 +961,156 @@ function SettingsPage({ hh: initialHh }: { hh: HouseholdRow }) {
 
 // ── Onboarding wizard (new users) ─────────────────────────────────────────────
 
-function OnboardingWizard() {
+function OnboardingWizard({ existingHh }: { existingHh?: HouseholdRow }) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>('household');
-  const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<Step>(() => {
+    const s = existingHh?.onboarding_step;
+    return (s && STEPS.includes(s as Step)) ? s as Step : 'household';
+  });
+  const [stepSaving, setStepSaving] = useState(false);
+  const [hhId, setHhId] = useState<string | null>(existingHh?.id ?? null);
 
-  const [hhName, setHhName] = useState('');
-  const [mode, setMode] = useState<Mode>('partner');
-  const [nameA, setNameA] = useState('');
-  const [nameB, setNameB] = useState('');
-  const [splitA, setSplitA] = useState('50');
-  const [paydayDay, setPaydayDay] = useState('25');
-  const [paydayDayB, setPaydayDayB] = useState('25');
+  const [hhName, setHhName] = useState(existingHh?.name ?? '');
+  const [mode, setMode] = useState<Mode>(existingHh?.mode ?? 'partner');
+  const [nameA, setNameA] = useState(existingHh?.person_a_name ?? '');
+  const [nameB, setNameB] = useState(existingHh?.person_b_name ?? '');
+  const [splitA, setSplitA] = useState(String(existingHh?.joint_split_a ?? 50));
+  const [paydayDay, setPaydayDay] = useState(String(existingHh?.payday_day ?? 25));
+  const [paydayDayB, setPaydayDayB] = useState(String(existingHh?.payday_day_b ?? 25));
 
   const [jointBills, setJointBills] = useState<BillDraft[]>(DEFAULT_JOINT_BILLS);
   const [billsA, setBillsA] = useState<BillDraft[]>([]);
   const [billsB, setBillsB] = useState<BillDraft[]>([]);
   const [debtsA, setDebtsA] = useState<DebtDraft[]>([]);
   const [debtsB, setDebtsB] = useState<DebtDraft[]>([]);
-  const [spendingA, setSpendingA] = useState('');
-  const [spendingB, setSpendingB] = useState('');
-  const [transportA, setTransportA] = useState('');
-  const [transportB, setTransportB] = useState('');
-  const [shortTermPots, setShortTermPots] = useState<PotDraft[]>(DEFAULT_SHORT_TERM.map(p => ({ ...p, owner: 'person_a' as const })));
-  const [longTermPots, setLongTermPots] = useState<PotDraft[]>(DEFAULT_LONG_TERM.map(p => ({ ...p, owner: 'person_a' as const })));
+  const [spendingA, setSpendingA] = useState(existingHh ? String(existingHh.default_spending_a || '') : '');
+  const [spendingB, setSpendingB] = useState(existingHh ? String(existingHh.default_spending_b || '') : '');
+  const [transportA, setTransportA] = useState(existingHh ? String(existingHh.default_transport_a || '') : '');
+  const [transportB, setTransportB] = useState(existingHh ? String(existingHh.default_transport_b || '') : '');
+  const [shortTermPots, setShortTermPots] = useState<PotDraft[]>([]);
+  const [longTermPots, setLongTermPots] = useState<PotDraft[]>([]);
+
+  useEffect(() => {
+    if (!existingHh?.id) return;
+    async function loadExisting() {
+      const id = existingHh!.id;
+      const [billsData, debtsData, potsData] = await Promise.all([
+        fetch(`/api/payday/bills?householdId=${id}`).then(r => r.json()),
+        fetch(`/api/payday/debts?householdId=${id}`).then(r => r.json()),
+        fetch(`/api/payday/pots?householdId=${id}`).then(r => r.json()),
+      ]);
+      const jb: BillDraft[] = (billsData as {id:string;name:string;amount:number;category:string}[]).filter(b => b.category === 'joint_fixed').map(b => ({ id: b.id, name: b.name, amount: String(b.amount) }));
+      setJointBills(jb.length > 0 ? jb : DEFAULT_JOINT_BILLS);
+      setBillsA((billsData as {id:string;name:string;amount:number;category:string}[]).filter(b => b.category === 'individual_a').map(b => ({ id: b.id, name: b.name, amount: String(b.amount) })));
+      setBillsB((billsData as {id:string;name:string;amount:number;category:string}[]).filter(b => b.category === 'individual_b').map(b => ({ id: b.id, name: b.name, amount: String(b.amount) })));
+      setDebtsA((debtsData as {id:string;name:string;amount:number;person:string}[]).filter(d => d.person === 'a').map(d => ({ id: d.id, name: d.name, amount: String(d.amount), person: 'a' as const })));
+      setDebtsB((debtsData as {id:string;name:string;amount:number;person:string}[]).filter(d => d.person === 'b').map(d => ({ id: d.id, name: d.name, amount: String(d.amount), person: 'b' as const })));
+      setShortTermPots((potsData as {id:string;name:string;target_amount:number|null;target_months:number|null;target_date:string|null;color:string;owner:string;pot_type:string;account_type:string|null;provider:string|null}[]).filter(p => p.pot_type === 'short_term').map(p => ({
+        id: p.id, name: p.name, targetAmount: String(p.target_amount ?? ''), targetMonths: String(p.target_months ?? '12'),
+        color: p.color, owner: p.owner as PotDraft['owner'], potType: 'short_term' as const,
+        targetMode: p.target_date ? 'date' : 'months', targetDate: p.target_date ?? undefined,
+      })));
+      setLongTermPots((potsData as {id:string;name:string;target_amount:number|null;target_months:number|null;target_date:string|null;color:string;owner:string;pot_type:string;account_type:string|null;provider:string|null}[]).filter(p => p.pot_type === 'long_term').map(p => ({
+        id: p.id, name: p.name, targetAmount: String(p.target_amount ?? ''), targetMonths: String(p.target_months ?? ''),
+        color: p.color, owner: p.owner as PotDraft['owner'], potType: 'long_term' as const,
+        accountType: (p.account_type ?? undefined) as AccountType | undefined, provider: p.provider ?? undefined,
+      })));
+    }
+    loadExisting();
+  }, [existingHh?.id]);
 
   const splitB = 100 - (parseInt(splitA) || 50);
   const isPartner = mode === 'partner';
   const stepIndex = STEPS.indexOf(step);
 
+  function hhBody(onboardingStep: string | null) {
+    return {
+      id: hhId ?? undefined,
+      name: hhName || 'Our Household', mode,
+      personAName: nameA || 'Person A', personBName: nameB || 'Person B',
+      jointSplitA: parseInt(splitA) || 50,
+      paydayDay: parseInt(paydayDay) || 25,
+      paydayDayB: isPartner ? (parseInt(paydayDayB) || 25) : (parseInt(paydayDay) || 25),
+      defaultSpendingA: parseFloat(spendingA) || 0,
+      defaultSpendingB: parseFloat(spendingB) || 0,
+      defaultTransportA: parseFloat(transportA) || 0,
+      defaultTransportB: parseFloat(transportB) || 0,
+      onboardingStep,
+    };
+  }
+
+  async function saveHouseholdStep(): Promise<string> {
+    const nextStep = STEPS[STEPS.indexOf('household') + 1];
+    const method = hhId ? 'PUT' : 'POST';
+    const body = hhId ? hhBody(nextStep) : { name: hhName || 'Our Household', mode, personAName: nameA || 'Person A', personBName: nameB || 'Person B', jointSplitA: parseInt(splitA) || 50, paydayDay: parseInt(paydayDay) || 25, paydayDayB: isPartner ? (parseInt(paydayDayB) || 25) : (parseInt(paydayDay) || 25), defaultSpendingA: 0, defaultSpendingB: 0, defaultTransportA: 0, defaultTransportB: 0, onboardingStep: nextStep };
+    const res = await fetch('/api/payday/households', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const hh = await res.json();
+    setHhId(hh.id);
+    return hh.id;
+  }
+
+  async function saveBillsDraft(currentHhId: string, category: string, bills: BillDraft[], nextStep: string) {
+    const existingRes = await fetch(`/api/payday/bills?householdId=${currentHhId}`);
+    const existing: {id:string;category:string}[] = await existingRes.json();
+    await Promise.all(existing.filter(b => b.category === category).map(b => fetch(`/api/payday/bills?id=${b.id}`, { method: 'DELETE' })));
+    await Promise.all(bills.filter(b => b.name && b.amount).map(b =>
+      fetch('/api/payday/bills', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: currentHhId, name: b.name, amount: parseFloat(b.amount), category }) })
+    ));
+    await fetch('/api/payday/households', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...hhBody(nextStep), id: currentHhId }) });
+  }
+
+  async function saveDebtsDraft(currentHhId: string, nextStep: string) {
+    const existingRes = await fetch(`/api/payday/debts?householdId=${currentHhId}`);
+    const existing: {id:string}[] = await existingRes.json();
+    await Promise.all(existing.map(d => fetch(`/api/payday/debts?id=${d.id}`, { method: 'DELETE' })));
+    await Promise.all([
+      ...debtsA.filter(d => d.name && d.amount).map(d => fetch('/api/payday/debts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: currentHhId, person: 'a', name: d.name, amount: parseFloat(d.amount) }) })),
+      ...debtsB.filter(d => d.name && d.amount).map(d => fetch('/api/payday/debts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: currentHhId, person: 'b', name: d.name, amount: parseFloat(d.amount) }) })),
+    ]);
+    await fetch('/api/payday/households', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...hhBody(nextStep), id: currentHhId }) });
+  }
+
+  async function savePotsDraft(currentHhId: string, potType: 'short_term' | 'long_term', pots: PotDraft[], nextStep: string | null) {
+    const existingRes = await fetch(`/api/payday/pots?householdId=${currentHhId}`);
+    const existing: {id:string;pot_type:string}[] = await existingRes.json();
+    await Promise.all(existing.filter(p => p.pot_type === potType).map(p => fetch(`/api/payday/pots?id=${p.id}`, { method: 'DELETE' })));
+    await Promise.all(pots.filter(p => p.name).map((p, i) =>
+      fetch('/api/payday/pots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: currentHhId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: p.targetMonths ? parseInt(p.targetMonths) : null, targetDate: p.targetDate ?? null, color: p.color, owner: p.owner, potType, sortOrder: i, accountType: p.accountType ?? null, provider: p.provider ?? null }) })
+    ));
+    await fetch('/api/payday/households', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...hhBody(nextStep), id: currentHhId }) });
+  }
+
+  async function next() {
+    if (stepIndex >= STEPS.length - 1) return;
+    setStepSaving(true);
+    try {
+      let currentHhId = hhId;
+      const nextStep = STEPS[stepIndex + 1];
+      if (step === 'household') {
+        currentHhId = await saveHouseholdStep();
+      } else if (currentHhId) {
+        if (step === 'joint_bills') {
+          await saveBillsDraft(currentHhId, 'joint_fixed', jointBills, nextStep);
+        } else if (step === 'personal_bills') {
+          await saveBillsDraft(currentHhId, 'individual_a', billsA, nextStep);
+          await saveBillsDraft(currentHhId, 'individual_b', billsB, nextStep);
+        } else if (step === 'debts') {
+          await saveDebtsDraft(currentHhId, nextStep);
+        } else if (step === 'lifestyle') {
+          await fetch('/api/payday/households', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...hhBody(nextStep), id: currentHhId }) });
+        } else if (step === 'short_term') {
+          await savePotsDraft(currentHhId, 'short_term', shortTermPots, nextStep);
+        }
+      }
+      setStep(nextStep);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setStepSaving(false);
+    }
+  }
+
   function prev() { if (stepIndex > 0) setStep(STEPS[stepIndex - 1]); }
-  function next() { if (stepIndex < STEPS.length - 1) setStep(STEPS[stepIndex + 1]); }
 
   function addBill(list: BillDraft[], set: (l: BillDraft[]) => void) { set([...list, { id: uid(), name: '', amount: '' }]); }
   function updateBill(list: BillDraft[], set: (l: BillDraft[]) => void, id: string, field: 'name' | 'amount', val: string) { set(list.map(b => b.id === id ? { ...b, [field]: val } : b)); }
@@ -1022,44 +1142,15 @@ function OnboardingWizard() {
   }
 
   async function finish() {
-    setSaving(true);
+    if (!hhId) return;
+    setStepSaving(true);
     try {
-      const hhRes = await fetch('/api/payday/households', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: hhName || 'Our Household', mode, personAName: nameA || 'Person A', personBName: nameB || 'Person B', jointSplitA: parseInt(splitA) || 50, paydayDay: parseInt(paydayDay) || 25, paydayDayB: isPartner ? (parseInt(paydayDayB) || 25) : (parseInt(paydayDay) || 25), defaultSpendingA: parseFloat(spendingA) || 0, defaultSpendingB: parseFloat(spendingB) || 0, defaultTransportA: parseFloat(transportA) || 0, defaultTransportB: parseFloat(transportB) || 0 }),
-      });
-      const hh = await hhRes.json();
-      const hhId = hh.id;
-
-      await Promise.all(jointBills.filter(b => b.name && b.amount).map(b =>
-        fetch('/api/payday/bills', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: hhId, name: b.name, amount: parseFloat(b.amount), category: 'joint_fixed' }) })
-      ));
-      await Promise.all(billsA.filter(b => b.name && b.amount).map(b =>
-        fetch('/api/payday/bills', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: hhId, name: b.name, amount: parseFloat(b.amount), category: 'individual_a' }) })
-      ));
-      if (isPartner) {
-        await Promise.all(billsB.filter(b => b.name && b.amount).map(b =>
-          fetch('/api/payday/bills', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: hhId, name: b.name, amount: parseFloat(b.amount), category: 'individual_b' }) })
-        ));
-      }
-      await Promise.all(debtsA.filter(d => d.name && d.amount).map(d =>
-        fetch('/api/payday/debts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: hhId, person: 'a', name: d.name, amount: parseFloat(d.amount) }) })
-      ));
-      if (isPartner) {
-        await Promise.all(debtsB.filter(d => d.name && d.amount).map(d =>
-          fetch('/api/payday/debts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: hhId, person: 'b', name: d.name, amount: parseFloat(d.amount) }) })
-        ));
-      }
-      const allPots = [...shortTermPots, ...longTermPots].filter(p => p.name);
-      await Promise.all(allPots.map((p, i) =>
-        fetch('/api/payday/pots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ householdId: hhId, name: p.name, targetAmount: p.targetAmount ? parseFloat(p.targetAmount) : null, targetMonths: p.targetMonths ? parseInt(p.targetMonths) : null, color: p.color, owner: p.owner, potType: p.potType, sortOrder: i, accountType: p.accountType ?? null, provider: p.provider ?? null }) })
-      ));
-
+      await savePotsDraft(hhId, 'long_term', longTermPots, null);
       router.push('/payday?onboarding=1');
     } catch (e) {
       console.error(e);
       alert('Something went wrong. Please try again.');
-      setSaving(false);
+      setStepSaving(false);
     }
   }
 
@@ -1318,7 +1409,7 @@ function OnboardingWizard() {
                 </>
               )}
               <div className="space-y-2 pt-2">
-                <WizardNextBtn onClick={finish} label={saving ? 'Setting up…' : "All done — let's go 🎉"} disabled={saving} />
+                <WizardNextBtn onClick={finish} label={stepSaving ? 'Setting up…' : "All done — let's go 🎉"} disabled={stepSaving} />
                 <WizardBackBtn onClick={prev} />
               </div>
             </div>
@@ -1363,6 +1454,10 @@ export default function SetupPage() {
 
   if (hh === null) {
     return <OnboardingWizard />;
+  }
+
+  if (hh.onboarding_step) {
+    return <OnboardingWizard existingHh={hh} />;
   }
 
   return <SettingsPage hh={hh} />;

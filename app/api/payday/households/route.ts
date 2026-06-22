@@ -32,8 +32,8 @@ export async function POST(req: Request) {
     sql: `INSERT INTO households
             (id, user_id, name, mode, person_a_name, person_b_name,
              joint_split_a, default_spending_a, default_spending_b,
-             default_transport_a, default_transport_b, payday_day, payday_day_b, created_at)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             default_transport_a, default_transport_b, payday_day, payday_day_b, onboarding_step, created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     args: [
       id, user.id,
       body.name, body.mode,
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       body.defaultTransportB ?? 0,
       body.paydayDay ?? 25,
       body.paydayDayB ?? body.paydayDay ?? 25,
+      body.onboardingStep ?? null,
       now,
     ],
   });
@@ -62,7 +63,7 @@ export async function PUT(req: Request) {
     sql: `UPDATE households SET
             name=?, mode=?, person_a_name=?, person_b_name=?,
             joint_split_a=?, default_spending_a=?, default_spending_b=?,
-            default_transport_a=?, default_transport_b=?, payday_day=?, payday_day_b=?
+            default_transport_a=?, default_transport_b=?, payday_day=?, payday_day_b=?, onboarding_step=?
           WHERE id=? AND user_id=?`,
     args: [
       body.name, body.mode,
@@ -74,6 +75,7 @@ export async function PUT(req: Request) {
       body.defaultTransportB ?? 0,
       body.paydayDay ?? 25,
       body.paydayDayB ?? body.paydayDay ?? 25,
+      body.onboardingStep ?? null,
       body.id, user.id,
     ],
   });
