@@ -492,20 +492,22 @@ function JointPotRow({ p, amount, splitA, splitB, nameA, nameB, onAmountChange }
     <div className="bg-[#f1f4f2] rounded-xl px-3 py-2.5 space-y-1.5">
       <div className="flex items-center gap-2">
         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-        <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">{p.name}</span>
+        <span className="text-sm text-[#181c1c] font-medium">{p.name}</span>
+      </div>
+      <div className="flex items-center gap-2 pl-4">
         <div className="relative w-28 shrink-0">
           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">£</span>
           <input type="number" min="0" value={amount} onChange={e=>onAmountChange(e.target.value)} placeholder="0"
             className="w-full pl-6 pr-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
         </div>
+        {total > 0 && (
+          <div className="flex gap-2 text-xs text-[#9aaa98]">
+            <span>{nameA}: {fmt(shareA)}</span>
+            <span>·</span>
+            <span>{nameB}: {fmt(shareB)}</span>
+          </div>
+        )}
       </div>
-      {total > 0 && (
-        <div className="flex gap-3 pl-4 text-xs text-[#9aaa98]">
-          <span>{nameA}: {fmt(shareA)}</span>
-          <span>·</span>
-          <span>{nameB}: {fmt(shareB)}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -545,19 +547,21 @@ function PotRow({ p, pct, available, onPctChange, inputMode, onToggleMode }: {
     <div className="bg-[#f1f4f2] rounded-xl px-3 py-2.5 space-y-1">
       <div className="flex items-center gap-2">
         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}} />
-        <span className="text-sm flex-1 text-[#181c1c] truncate font-medium">
+        <span className="text-sm text-[#181c1c] font-medium leading-snug">
           {p.name}
           {p.account_type && ACCT_LABELS[p.account_type] && <span className="ml-1 text-xs text-[#717970]">· {ACCT_LABELS[p.account_type]}</span>}
         </span>
+      </div>
+      <div className="flex items-center gap-2 pl-4">
         <button onClick={onToggleMode} className="text-xs px-1.5 py-0.5 rounded-md border border-[#c1c9be] text-[#717970] hover:border-[#7bae7f] hover:text-[#396940] font-bold transition-colors shrink-0">
           {isGbp ? '£' : '%'}
         </button>
-        <div className="relative w-20 shrink-0">
+        <div className="relative w-24 shrink-0">
           <input type="number" min="0" value={displayVal} onChange={e=>handleChange(e.target.value)} placeholder="0"
             className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">{isGbp ? '£' : '%'}</span>
         </div>
-        <span className="text-sm text-[#414940] w-20 text-right tabular-nums shrink-0 font-semibold">{isGbp ? (pct > 0 ? `${Math.round(pct)}%` : '—') : (amount > 0 ? fmt(amount) : '—')}</span>
+        <span className="text-sm text-[#414940] tabular-nums font-semibold">{isGbp ? (pct > 0 ? `${Math.round(pct)}%` : '—') : (amount > 0 ? fmt(amount) : '—')}</span>
       </div>
       {rec && <div className="text-xs text-[#9aaa98] pl-4">{rec}</div>}
     </div>
