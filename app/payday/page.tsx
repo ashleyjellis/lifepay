@@ -525,23 +525,25 @@ function potRec(pot: Pot, monthly: number, available: number): string {
   return `£${Math.round(monthly)} allocated this month`;
 }
 
-function PotRow({ p, pct, available, onPctChange, inputMode, onToggleMode }: {
-  p: Pot; pct: number; available: number;
+function PotRow({ p, pct, gbpValue, pctPool, available, onPctChange, onGbpChange, inputMode, onToggleMode }: {
+  p: Pot; pct: number; gbpValue: number; pctPool: number; available: number;
   onPctChange: (val: string) => void;
+  onGbpChange: (val: string) => void;
   inputMode: 'pct' | 'gbp';
   onToggleMode: () => void;
 }) {
-  const amount = available * (pct / 100);
   const isGbp = inputMode === 'gbp';
-  const displayVal = isGbp ? (amount > 0 ? amount.toFixed(0) : '') : (pct > 0 ? String(pct) : '');
+  const amount = isGbp ? gbpValue : pctPool * (pct / 100);
+  const displayVal = isGbp ? (gbpValue > 0 ? String(gbpValue) : '') : (pct > 0 ? String(Math.round(pct)) : '');
   function handleChange(raw: string) {
-    const v = parseFloat(raw) || 0;
     if (isGbp) {
-      onPctChange(available > 0 ? String(Math.min(100, (v / available) * 100)) : '0');
+      onGbpChange(raw);
     } else {
-      onPctChange(raw);
+      const v = Math.round(Math.max(0, Math.min(100, parseFloat(raw) || 0)));
+      onPctChange(String(v));
     }
   }
+  const impliedPct = isGbp ? (pctPool > 0 ? Math.round(gbpValue / pctPool * 100) : 0) : pct;
   const rec = p.pot_type === 'short_term' ? potRec(p, amount, available) : '';
   return (
     <div className="bg-[#f1f4f2] rounded-xl px-3 py-2.5 space-y-1">
@@ -557,11 +559,11 @@ function PotRow({ p, pct, available, onPctChange, inputMode, onToggleMode }: {
           {isGbp ? '£' : '%'}
         </button>
         <div className="relative w-24 shrink-0">
-          <input type="number" min="0" value={displayVal} onChange={e=>handleChange(e.target.value)} placeholder="0"
+          <input type="number" min="0" step="1" value={displayVal} onChange={e=>handleChange(e.target.value)} placeholder="0"
             className="w-full pr-7 pl-2 py-1.5 text-sm rounded-lg border border-[#c1c9be] focus:outline-none focus:ring-2 focus:ring-[#7bae7f] text-right font-semibold" />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#717970] text-xs font-medium">{isGbp ? '£' : '%'}</span>
         </div>
-        <span className="text-sm text-[#414940] tabular-nums font-semibold">{isGbp ? (pct > 0 ? `${Math.round(pct)}%` : '—') : (amount > 0 ? fmt(amount) : '—')}</span>
+        <span className="text-sm text-[#414940] tabular-nums font-semibold">{isGbp ? (gbpValue > 0 ? `≈${impliedPct}%` : '—') : (amount > 0 ? fmt(amount) : '—')}</span>
       </div>
       {rec && <div className="text-xs text-[#9aaa98] pl-4">{rec}</div>}
     </div>
@@ -682,6 +684,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const [travelB, setTravelB] = useState('');
   const [percentsA, setPercentsA] = useState<Record<string,string>>({});
   const [percentsB, setPercentsB] = useState<Record<string,string>>({});
+  const [valuesA, setValuesA] = useState<Record<string,string>>({});
+  const [valuesB, setValuesB] = useState<Record<string,string>>({});
   const [jointPotAmounts, setJointPotAmounts] = useState<Record<string,string>>({});
   const [inputModeA, setInputModeA] = useState<Record<string,'pct'|'gbp'>>({});
   const [inputModeB, setInputModeB] = useState<Record<string,'pct'|'gbp'>>({});
@@ -798,12 +802,19 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const jointSavForB = potsJoint.reduce((s,p)=>s+(parseFloat(jointPotAmounts[p.id])||0)*(splitB/100),0);
   const availableA = iA-(jointTotal*splitA/100)-extrasForA-personalTotalA-jointSavForA;
   const availableB = iB-(jointTotal*splitB/100)-extrasForB-personalTotalB-jointSavForB;
-  const potAmountA = (id: string) => availableA*((parseFloat(percentsA[id])||0)/100);
-  const potAmountB = (id: string) => availableB*((parseFloat(percentsB[id])||0)/100);
-  const allocPctA = potsPersonA.reduce((s,p)=>s+(parseFloat(percentsA[p.id])||0),0);
-  const allocPctB = potsPersonB.reduce((s,p)=>s+(parseFloat(percentsB[p.id])||0),0);
-  const aReady = potsPersonA.length===0||Math.abs(100-allocPctA)<0.01;
-  const bReady = !isPartner||(potsPersonB.length===0||Math.abs(100-allocPctB)<0.01);
+  // Fixed-£ pots are deducted from the pool first; remaining split by whole-% among pct-mode pots
+  const fixedTotalA = potsPersonA.filter(p=>inputModeA[p.id]==='gbp').reduce((s,p)=>s+(parseFloat(valuesA[p.id])||0),0);
+  const fixedTotalB = potsPersonB.filter(p=>inputModeB[p.id]==='gbp').reduce((s,p)=>s+(parseFloat(valuesB[p.id])||0),0);
+  const pctPoolA = Math.max(0, availableA - fixedTotalA);
+  const pctPoolB = Math.max(0, availableB - fixedTotalB);
+  const potAmountA = (id: string) => inputModeA[id]==='gbp' ? (parseFloat(valuesA[id])||0) : pctPoolA*((parseFloat(percentsA[id])||0)/100);
+  const potAmountB = (id: string) => inputModeB[id]==='gbp' ? (parseFloat(valuesB[id])||0) : pctPoolB*((parseFloat(percentsB[id])||0)/100);
+  const allocPctA = potsPersonA.filter(p=>inputModeA[p.id]!=='gbp').reduce((s,p)=>s+(parseFloat(percentsA[p.id])||0),0);
+  const allocPctB = potsPersonB.filter(p=>inputModeB[p.id]!=='gbp').reduce((s,p)=>s+(parseFloat(percentsB[p.id])||0),0);
+  const pctPotsA = potsPersonA.filter(p=>inputModeA[p.id]!=='gbp');
+  const pctPotsB = potsPersonB.filter(p=>inputModeB[p.id]!=='gbp');
+  const aReady = fixedTotalA<=availableA&&(pctPotsA.length===0||Math.abs(100-allocPctA)<0.5);
+  const bReady = !isPartner||(fixedTotalB<=availableB&&(pctPotsB.length===0||Math.abs(100-allocPctB)<0.5));
   const canLock = aReady&&bReady&&availableA>=0&&(!isPartner||availableB>=0);
   const totalSavingsA = potsPersonA.reduce((s,p)=>s+potAmountA(p.id),0)+jointSavForA;
   const totalSavingsB = potsPersonB.reduce((s,p)=>s+potAmountB(p.id),0)+jointSavForB;
@@ -850,6 +861,8 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
       onPotsChanged(updated);
       setPercentsA(p=>({...p,[newPot.id]:''}));
       setPercentsB(p=>({...p,[newPot.id]:''}));
+      setValuesA(p=>({...p,[newPot.id]:''}));
+      setValuesB(p=>({...p,[newPot.id]:''}));
     }
   }
 
@@ -1063,30 +1076,46 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
             <div className="space-y-2">
               {potsPersonA.filter(p=>p.pot_type==='short_term').length>0 && <SLabel>Short-term goals</SLabel>}
               {potsPersonA.filter(p=>p.pot_type==='short_term').map(p => (
-                <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0} available={availableA}
+                <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0}
+                  gbpValue={parseFloat(valuesA[p.id])||0} pctPool={pctPoolA} available={availableA}
                   onPctChange={v=>setPercentsA(prev=>({...prev,[p.id]:v}))}
+                  onGbpChange={v=>setValuesA(prev=>({...prev,[p.id]:v}))}
                   inputMode={inputModeA[p.id]??'pct'}
-                  onToggleMode={()=>setInputModeA(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+                  onToggleMode={()=>setInputModeA(prev=>{
+                    const next = prev[p.id]==='gbp'?'pct':'gbp';
+                    if(next==='gbp'){const curAmt=pctPoolA*((parseFloat(percentsA[p.id])||0)/100);setValuesA(v=>({...v,[p.id]:curAmt>0?String(Math.round(curAmt)):''}));}
+                    else{const newPool=pctPoolA+(parseFloat(valuesA[p.id])||0);const newPct=newPool>0?Math.round((parseFloat(valuesA[p.id])||0)/newPool*100):0;setPercentsA(v=>({...v,[p.id]:String(newPct)}));setValuesA(v=>({...v,[p.id]:''}));}
+                    return {...prev,[p.id]:next};
+                  })} />
               ))}
               {potsPersonA.filter(p=>p.pot_type!=='short_term').length>0 && <SLabel>Long-term savings</SLabel>}
               {potsPersonA.filter(p=>p.pot_type!=='short_term').map(p => (
-                <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0} available={availableA}
+                <PotRow key={p.id} p={p} pct={parseFloat(percentsA[p.id])||0}
+                  gbpValue={parseFloat(valuesA[p.id])||0} pctPool={pctPoolA} available={availableA}
                   onPctChange={v=>setPercentsA(prev=>({...prev,[p.id]:v}))}
+                  onGbpChange={v=>setValuesA(prev=>({...prev,[p.id]:v}))}
                   inputMode={inputModeA[p.id]??'pct'}
-                  onToggleMode={()=>setInputModeA(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+                  onToggleMode={()=>setInputModeA(prev=>{
+                    const next = prev[p.id]==='gbp'?'pct':'gbp';
+                    if(next==='gbp'){const curAmt=pctPoolA*((parseFloat(percentsA[p.id])||0)/100);setValuesA(v=>({...v,[p.id]:curAmt>0?String(Math.round(curAmt)):''}));}
+                    else{const newPool=pctPoolA+(parseFloat(valuesA[p.id])||0);const newPct=newPool>0?Math.round((parseFloat(valuesA[p.id])||0)/newPool*100):0;setPercentsA(v=>({...v,[p.id]:String(newPct)}));setValuesA(v=>({...v,[p.id]:''}));}
+                    return {...prev,[p.id]:next};
+                  })} />
               ))}
             </div>
             <AddPotRow owner="person_a" onAdd={addPot} />
             {potsPersonA.length > 0 && (() => {
               const ltTotalA = potsPersonA.filter(p=>p.pot_type!=='short_term').reduce((s,p)=>s+potAmountA(p.id),0);
               const stTotalA = potsPersonA.filter(p=>p.pot_type==='short_term').reduce((s,p)=>s+potAmountA(p.id),0);
+              const fixedCount = potsPersonA.filter(p=>inputModeA[p.id]==='gbp').length;
               return (
                 <div className="mt-3 space-y-1.5">
                   {ltTotalA > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Long-term total</span><span className="font-semibold">{fmt(ltTotalA)}/mo</span></div>}
                   {stTotalA > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Short-term total</span><span className="font-semibold">{fmt(stTotalA)}/mo</span></div>}
+                  {fixedCount>0 && pctPotsA.length>0 && <div className="text-xs text-[#9aaa98]">{fmt(fixedTotalA)} fixed · {fmt(pctPoolA)} left to allocate by %</div>}
                   <div className={`flex justify-between text-xs font-bold pt-1 border-t border-[#ebeeed] ${aReady?'text-[#396940]':'text-[#717970]'}`}>
-                    <span>{Math.round(allocPctA)}% allocated</span>
-                    <span>{aReady?'✓ All allocated':`${(100-allocPctA).toFixed(0)}% remaining`}</span>
+                    {pctPotsA.length>0 ? <span>{Math.round(allocPctA)}% allocated</span> : <span>{fixedCount} fixed-£ {fixedCount===1?'pot':'pots'}</span>}
+                    <span>{aReady?'✓ All allocated':pctPotsA.length>0?`${(100-allocPctA).toFixed(0)}% remaining`:'Over budget'}</span>
                   </div>
                 </div>
               );
@@ -1102,30 +1131,46 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
               <div className="space-y-2">
                 {potsPersonB.filter(p=>p.pot_type==='short_term').length>0 && <SLabel>Short-term goals</SLabel>}
                 {potsPersonB.filter(p=>p.pot_type==='short_term').map(p => (
-                  <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0} available={availableB}
+                  <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0}
+                    gbpValue={parseFloat(valuesB[p.id])||0} pctPool={pctPoolB} available={availableB}
                     onPctChange={v=>setPercentsB(prev=>({...prev,[p.id]:v}))}
+                    onGbpChange={v=>setValuesB(prev=>({...prev,[p.id]:v}))}
                     inputMode={inputModeB[p.id]??'pct'}
-                    onToggleMode={()=>setInputModeB(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+                    onToggleMode={()=>setInputModeB(prev=>{
+                      const next = prev[p.id]==='gbp'?'pct':'gbp';
+                      if(next==='gbp'){const curAmt=pctPoolB*((parseFloat(percentsB[p.id])||0)/100);setValuesB(v=>({...v,[p.id]:curAmt>0?String(Math.round(curAmt)):''}));}
+                      else{const newPool=pctPoolB+(parseFloat(valuesB[p.id])||0);const newPct=newPool>0?Math.round((parseFloat(valuesB[p.id])||0)/newPool*100):0;setPercentsB(v=>({...v,[p.id]:String(newPct)}));setValuesB(v=>({...v,[p.id]:''}));}
+                      return {...prev,[p.id]:next};
+                    })} />
                 ))}
                 {potsPersonB.filter(p=>p.pot_type!=='short_term').length>0 && <SLabel>Long-term savings</SLabel>}
                 {potsPersonB.filter(p=>p.pot_type!=='short_term').map(p => (
-                  <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0} available={availableB}
+                  <PotRow key={p.id} p={p} pct={parseFloat(percentsB[p.id])||0}
+                    gbpValue={parseFloat(valuesB[p.id])||0} pctPool={pctPoolB} available={availableB}
                     onPctChange={v=>setPercentsB(prev=>({...prev,[p.id]:v}))}
+                    onGbpChange={v=>setValuesB(prev=>({...prev,[p.id]:v}))}
                     inputMode={inputModeB[p.id]??'pct'}
-                    onToggleMode={()=>setInputModeB(prev=>({...prev,[p.id]:prev[p.id]==='gbp'?'pct':'gbp'}))} />
+                    onToggleMode={()=>setInputModeB(prev=>{
+                      const next = prev[p.id]==='gbp'?'pct':'gbp';
+                      if(next==='gbp'){const curAmt=pctPoolB*((parseFloat(percentsB[p.id])||0)/100);setValuesB(v=>({...v,[p.id]:curAmt>0?String(Math.round(curAmt)):''}));}
+                      else{const newPool=pctPoolB+(parseFloat(valuesB[p.id])||0);const newPct=newPool>0?Math.round((parseFloat(valuesB[p.id])||0)/newPool*100):0;setPercentsB(v=>({...v,[p.id]:String(newPct)}));setValuesB(v=>({...v,[p.id]:''}));}
+                      return {...prev,[p.id]:next};
+                    })} />
                 ))}
               </div>
               <AddPotRow owner="person_b" onAdd={addPot} />
               {potsPersonB.length > 0 && (() => {
                 const ltTotalB = potsPersonB.filter(p=>p.pot_type!=='short_term').reduce((s,p)=>s+potAmountB(p.id),0);
                 const stTotalB = potsPersonB.filter(p=>p.pot_type==='short_term').reduce((s,p)=>s+potAmountB(p.id),0);
+                const fixedCountB = potsPersonB.filter(p=>inputModeB[p.id]==='gbp').length;
                 return (
                   <div className="mt-3 space-y-1.5">
                     {ltTotalB > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Long-term total</span><span className="font-semibold">{fmt(ltTotalB)}/mo</span></div>}
                     {stTotalB > 0 && <div className="flex justify-between text-xs text-[#717970]"><span>Short-term total</span><span className="font-semibold">{fmt(stTotalB)}/mo</span></div>}
+                    {fixedCountB>0 && pctPotsB.length>0 && <div className="text-xs text-[#9aaa98]">{fmt(fixedTotalB)} fixed · {fmt(pctPoolB)} left to allocate by %</div>}
                     <div className={`flex justify-between text-xs font-bold pt-1 border-t border-[#ebeeed] ${bReady?'text-[#396940]':'text-[#717970]'}`}>
-                      <span>{Math.round(allocPctB)}% allocated</span>
-                      <span>{bReady?'✓ All allocated':`${(100-allocPctB).toFixed(0)}% remaining`}</span>
+                      {pctPotsB.length>0 ? <span>{Math.round(allocPctB)}% allocated</span> : <span>{fixedCountB} fixed-£ {fixedCountB===1?'pot':'pots'}</span>}
+                      <span>{bReady?'✓ All allocated':pctPotsB.length>0?`${(100-allocPctB).toFixed(0)}% remaining`:'Over budget'}</span>
                     </div>
                   </div>
                 );
