@@ -226,8 +226,7 @@ export default function PaydayHome() {
             <Link href="/payday/savings" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Short Savings</Link>
             <Link href="/payday/growth" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Growth</Link>
             <Link href="/payday/forecast" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Forecast</Link>
-            <Link href="/payday/accounts" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Accounts</Link>
-            <Link href="/payday/setup" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Setup</Link>
+<Link href="/payday/setup" className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Setup</Link>
             <button onClick={async () => { await fetch('/api/payday/auth/logout', { method: 'POST' }); router.push('/payday/login'); }}
               className="text-sm text-[#414940] hover:text-[#396940] font-medium transition-colors">Sign out</button>
           </div>
