@@ -5,49 +5,63 @@ import { Quicksand } from 'next/font/google';
 
 const quicksand = Quicksand({ subsets: ['latin'], weight: ['500', '600', '700'] });
 
-interface AccountNumber {
-  iban?: string;
-  number?: string;
-  sort_code?: string;
-}
-interface Balance {
-  available: number;
-  current: number;
-  currency: string;
-  update_timestamp: string;
-}
 interface Account {
-  account_id: string;
-  account_type: string;
-  display_name: string;
-  currency: string;
-  account_number: AccountNumber;
-  provider: { display_name: string; logo_uri?: string };
-  balance?: Balance | null;
+  id: string;
+  name: string;
+  type: string;
+  balance: number;
+  currencyDenominatedBalance: { unscaledValue: number; scale: number; currencyCode: string } | null;
+  accountNumber: string;
+  closed: boolean;
 }
+
 interface Transaction {
-  transaction_id: string;
-  timestamp: string;
-  description: string;
-  merchant_name?: string;
-  transaction_type: string;
-  transaction_category: string;
+  id: string;
+  accountId: string;
   amount: number;
-  currency: string;
+  currencyDenominatedAmount: { unscaledValue: number; scale: number; currencyCode: string } | null;
+  date: number;
+  description: string;
+  originalDescription: string;
+  status: string;
+  type: string;
+  pending?: boolean;
+}
+
+function tinkAmount(tx: Transaction): number {
+  if (tx.currencyDenominatedAmount) {
+    const { unscaledValue, scale } = tx.currencyDenominatedAmount;
+    return unscaledValue / Math.pow(10, scale);
+  }
+  return tx.amount / 100;
+}
+
+function accountBalance(acc: Account): { amount: number; currency: string } {
+  if (acc.currencyDenominatedBalance) {
+    const { unscaledValue, scale, currencyCode } = acc.currencyDenominatedBalance;
+    return { amount: unscaledValue / Math.pow(10, scale), currency: currencyCode };
+  }
+  return { amount: acc.balance / 100, currency: 'GBP' };
 }
 
 const fmt = (v: number, currency = 'GBP') =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency, minimumFractionDigits: 2 }).format(v);
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  PURCHASE: '🛍️', TRANSFER: '↔️', DIRECT_DEBIT: '📋', STANDING_ORDER: '📆',
-  CREDIT: '💳', ATM: '🏧', FEE: '💸', INTEREST: '📈', CASH: '💵',
+const TYPE_LABEL: Record<string, string> = {
+  CHECKING: 'Current',
+  SAVINGS: 'Savings',
+  CREDIT_CARD: 'Credit Card',
+  INVESTMENT: 'Investment',
+  LOAN: 'Loan',
+  PENSION: 'Pension',
+  MORTGAGE: 'Mortgage',
+  OTHER: 'Other',
 };
 
-function sortCode(raw?: string) {
-  if (!raw) return null;
-  return raw.replace(/(\d{2})(\d{2})(\d{2})/, '$1-$2-$3');
-}
+const TYPE_EMOJI: Record<string, string> = {
+  WITHDRAWAL: '💸', TRANSFER: '↔️', PAYMENT: '💳', DEPOSIT: '💰',
+  CREDIT_CARD: '🏦', OTHER: '📋',
+};
 
 export default function AccountsPage() {
   const router = useRouter();
@@ -61,17 +75,17 @@ export default function AccountsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for error from callback redirect
     const params = new URLSearchParams(window.location.search);
-    if (params.get('error')) setError('Bank connection was denied or failed. Please try again.');
+    if (params.get('error')) setError('Bank connection was cancelled or failed. Please try again.');
 
-    fetch('/api/payday/truelayer/accounts')
-      .then(r => { if (r.status === 401) router.replace('/payday/login'); return r.ok ? r.json() : null; })
+    fetch('/api/payday/tink/accounts')
+      .then(r => { if (r.status === 401) { router.replace('/payday/login'); return null; } return r.ok ? r.json() : null; })
       .then(data => {
         if (!data) return;
         setConnected(data.connected);
-        setAccounts(data.accounts ?? []);
-        if (data.accounts?.length > 0) setSelectedAccount(data.accounts[0].account_id);
+        const active = (data.accounts ?? []).filter((a: Account) => !a.closed);
+        setAccounts(active);
+        if (active.length > 0) setSelectedAccount(active[0].id);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -80,7 +94,7 @@ export default function AccountsPage() {
     if (!selectedAccount) return;
     setTxLoading(true);
     setTransactions([]);
-    fetch(`/api/payday/truelayer/transactions?accountId=${selectedAccount}`)
+    fetch(`/api/payday/tink/transactions?accountId=${selectedAccount}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.transactions) setTransactions(data.transactions); })
       .finally(() => setTxLoading(false));
@@ -89,9 +103,9 @@ export default function AccountsPage() {
   async function handleConnect() {
     setConnecting(true);
     try {
-      const res = await fetch('/api/payday/truelayer/connect');
+      const res = await fetch('/api/payday/tink/connect');
       const data = await res.json();
-      if (data.authUrl) window.location.href = data.authUrl;
+      if (data.linkUrl) window.location.href = data.linkUrl;
     } catch {
       setError('Could not start connection. Please try again.');
       setConnecting(false);
@@ -101,7 +115,7 @@ export default function AccountsPage() {
   async function handleDisconnect() {
     if (!confirm('Disconnect your bank? You can reconnect at any time.')) return;
     setDisconnecting(true);
-    await fetch('/api/payday/truelayer/disconnect', { method: 'DELETE' });
+    await fetch('/api/payday/tink/disconnect', { method: 'DELETE' });
     setConnected(false);
     setAccounts([]);
     setSelectedAccount(null);
@@ -109,7 +123,7 @@ export default function AccountsPage() {
     setDisconnecting(false);
   }
 
-  const selected = accounts.find(a => a.account_id === selectedAccount);
+  const selected = accounts.find(a => a.id === selectedAccount);
 
   return (
     <main className={`${quicksand.className} min-h-screen bg-[#f7faf8] px-4 py-8 max-w-2xl mx-auto`}>
@@ -138,7 +152,7 @@ export default function AccountsPage() {
           <div className="text-5xl mb-4">🏦</div>
           <h2 className="text-lg font-bold text-[#181c1c] mb-2">Connect your bank</h2>
           <p className="text-sm text-[#717970] mb-6 max-w-sm mx-auto">
-            Securely link your bank account to see live balances and transactions. We use TrueLayer&apos;s
+            Securely link your bank account to see live balances and transactions. We use Tink&apos;s
             Open Banking connection — your credentials are never shared with us.
           </p>
           <button onClick={handleConnect} disabled={connecting}
@@ -146,62 +160,50 @@ export default function AccountsPage() {
             {connecting ? 'Connecting…' : 'Connect bank account'}
           </button>
           <p className="text-xs text-[#9aaa98] mt-4">
-            Powered by TrueLayer · Read-only access · Disconnect any time
+            Powered by Tink · Read-only access · Disconnect any time
           </p>
         </div>
       )}
 
-      {/* ── Loading state ── */}
+      {/* ── Loading ── */}
       {connected === null && (
         <div className="space-y-3">
-          {[1,2].map(i => (
+          {[1, 2].map(i => (
             <div key={i} className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)] animate-pulse h-24" />
           ))}
         </div>
       )}
 
-      {/* ── Connected: account list ── */}
+      {/* ── Connected ── */}
       {connected && accounts.length > 0 && (
         <>
           <div className="space-y-3 mb-6">
-            {accounts.map(a => (
-              <button key={a.account_id} onClick={() => setSelectedAccount(a.account_id)}
-                className={`w-full text-left bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)] transition-all border-2 ${
-                  selectedAccount === a.account_id ? 'border-[#7bae7f]' : 'border-transparent'
-                }`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-[#181c1c] text-sm">{a.display_name}</span>
-                      <span className="text-xs text-[#717970] bg-[#f1f4f2] px-2 py-0.5 rounded-full capitalize">
-                        {a.account_type.replace(/_/g, ' ').toLowerCase()}
-                      </span>
-                    </div>
-                    <div className="text-xs text-[#9aaa98] font-medium">{a.provider.display_name}</div>
-                    {a.account_number.sort_code && (
-                      <div className="text-xs text-[#717970] mt-1">
-                        {sortCode(a.account_number.sort_code)} · {a.account_number.number}
+            {accounts.map(a => {
+              const bal = accountBalance(a);
+              return (
+                <button key={a.id} onClick={() => setSelectedAccount(a.id)}
+                  className={`w-full text-left bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)] transition-all border-2 ${
+                    selectedAccount === a.id ? 'border-[#7bae7f]' : 'border-transparent'
+                  }`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-[#181c1c] text-sm">{a.name}</span>
+                        <span className="text-xs text-[#717970] bg-[#f1f4f2] px-2 py-0.5 rounded-full">
+                          {TYPE_LABEL[a.type] ?? a.type}
+                        </span>
                       </div>
-                    )}
-                    {a.account_number.iban && !a.account_number.sort_code && (
-                      <div className="text-xs text-[#717970] mt-1 font-mono">{a.account_number.iban}</div>
-                    )}
-                  </div>
-                  {a.balance && (
-                    <div className="text-right shrink-0">
-                      <div className="font-bold text-lg text-[#181c1c]">
-                        {fmt(a.balance.current, a.balance.currency)}
-                      </div>
-                      {a.balance.available !== a.balance.current && (
-                        <div className="text-xs text-[#717970]">
-                          {fmt(a.balance.available, a.balance.currency)} available
-                        </div>
+                      {a.accountNumber && (
+                        <div className="text-xs text-[#9aaa98] font-medium">{a.accountNumber}</div>
                       )}
                     </div>
-                  )}
-                </div>
-              </button>
-            ))}
+                    <div className="text-right shrink-0">
+                      <div className="font-bold text-lg text-[#181c1c]">{fmt(bal.amount, bal.currency)}</div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {/* ── Transactions ── */}
@@ -210,18 +212,18 @@ export default function AccountsPage() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="font-bold text-[#181c1c]">Recent transactions</div>
-                  <div className="text-xs text-[#717970] mt-0.5">{selected.display_name} · last 30 days</div>
+                  <div className="text-xs text-[#717970] mt-0.5">{selected.name}</div>
                 </div>
                 {transactions.length > 0 && (
                   <span className="text-xs text-[#717970] bg-[#f1f4f2] px-2 py-1 rounded-full font-semibold">
-                    {transactions.length} transactions
+                    {transactions.length}
                   </span>
                 )}
               </div>
 
               {txLoading && (
                 <div className="space-y-3">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="flex justify-between items-center py-2 animate-pulse">
                       <div className="flex gap-3 items-center">
                         <div className="w-8 h-8 rounded-full bg-[#f1f4f2]" />
@@ -237,20 +239,22 @@ export default function AccountsPage() {
               )}
 
               {!txLoading && transactions.length === 0 && (
-                <div className="text-center py-8 text-[#9aaa98] text-sm">No transactions found for this period.</div>
+                <div className="text-center py-8 text-[#9aaa98] text-sm">No transactions found.</div>
               )}
 
               {!txLoading && transactions.length > 0 && (
                 <div className="divide-y divide-[#f0f2f0]">
-                  {transactions
-                    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+                  {[...transactions]
+                    .sort((a, b) => b.date - a.date)
                     .map(tx => {
-                      const isCredit = tx.amount > 0;
-                      const date = new Date(tx.timestamp);
-                      const label = tx.merchant_name || tx.description;
-                      const emoji = CATEGORY_EMOJI[tx.transaction_category] ?? '💳';
+                      const amt = tinkAmount(tx);
+                      const isCredit = amt > 0;
+                      const date = new Date(tx.date);
+                      const label = tx.description || tx.originalDescription;
+                      const emoji = TYPE_EMOJI[tx.type] ?? '📋';
+                      const currency = tx.currencyDenominatedAmount?.currencyCode ?? 'GBP';
                       return (
-                        <div key={tx.transaction_id} className="flex items-center justify-between py-3 gap-3">
+                        <div key={tx.id} className="flex items-center justify-between py-3 gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-9 h-9 rounded-full bg-[#f1f4f2] flex items-center justify-center text-base shrink-0">
                               {emoji}
@@ -259,13 +263,12 @@ export default function AccountsPage() {
                               <div className="text-sm font-semibold text-[#181c1c] truncate">{label}</div>
                               <div className="text-xs text-[#9aaa98]">
                                 {date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                                {' · '}
-                                <span className="capitalize">{tx.transaction_category.replace(/_/g, ' ').toLowerCase()}</span>
+                                {tx.pending && <span className="ml-1 text-[#f4a261]">· Pending</span>}
                               </div>
                             </div>
                           </div>
                           <div className={`text-sm font-bold shrink-0 ${isCredit ? 'text-[#396940]' : 'text-[#181c1c]'}`}>
-                            {isCredit ? '+' : ''}{fmt(tx.amount, tx.currency)}
+                            {isCredit ? '+' : ''}{fmt(amt, currency)}
                           </div>
                         </div>
                       );
@@ -275,6 +278,15 @@ export default function AccountsPage() {
             </div>
           )}
         </>
+      )}
+
+      {connected && accounts.length === 0 && (
+        <div className="bg-white rounded-[20px] p-8 shadow-[0_2px_16px_rgba(57,105,64,0.07)] text-center">
+          <div className="text-4xl mb-3">🏦</div>
+          <p className="text-sm text-[#717970] mb-4">No accounts found. Your bank may still be syncing.</p>
+          <button onClick={() => window.location.reload()}
+            className="text-sm text-[#396940] font-semibold hover:underline">Refresh</button>
+        </div>
       )}
     </main>
   );
