@@ -163,6 +163,16 @@ export async function initSchema() {
       UNIQUE(household_id, year),
       FOREIGN KEY (household_id) REFERENCES households(id)
     );
+
+    CREATE TABLE IF NOT EXISTS truelayer_connections (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
 
   // Migrations — each wrapped so re-runs are safe
