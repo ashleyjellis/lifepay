@@ -35,9 +35,10 @@ export async function createTinkUser(externalUserId: string): Promise<string> {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ external_user_id: externalUserId, market: 'GB', locale: 'en_GB' }),
   });
-  if (!res.ok) throw new Error(`Tink createUser failed: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  return data.user_id;
+  const body = await res.json();
+  console.log('[Tink createUser] status:', res.status, 'body:', JSON.stringify(body));
+  if (!res.ok) throw new Error(`Tink createUser failed: ${res.status} ${JSON.stringify(body)}`);
+  return body.user_id;
 }
 
 async function getAuthCode(tinkUserId: string): Promise<string> {
