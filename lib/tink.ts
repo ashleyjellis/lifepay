@@ -19,7 +19,7 @@ async function getAppToken(): Promise<string> {
       client_id: CLIENT_ID,
       client_secret: CLIENT_SECRET,
       grant_type: 'client_credentials',
-      scope: 'authorization:grant,user:create',
+      scope: 'authorization:grant user:create',
     }),
   });
   if (!res.ok) throw new Error(`Tink app token failed: ${res.status} ${await res.text()}`);
@@ -49,7 +49,7 @@ async function getAuthCode(tinkUserId: string): Promise<string> {
       user_id: tinkUserId,
       id_hint: tinkUserId,
       actor_client_id: CLIENT_ID,
-      scope: 'accounts:read,balances:read,transactions:read,credentials:read,credentials:write,credentials:refresh,provider-consents:read',
+      scope: 'accounts:read balances:read transactions:read credentials:read credentials:write credentials:refresh providers:read provider-consents:read',
     }),
   });
   if (!res.ok) throw new Error(`Tink getAuthCode failed: ${res.status} ${await res.text()}`);
