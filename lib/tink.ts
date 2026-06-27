@@ -44,8 +44,8 @@ async function getAuthCode(tinkUserId: string): Promise<string> {
   const token = await getAppToken();
   const res = await fetch(`${API_BASE}/oauth/authorization-grant/delegate`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       user_id: tinkUserId,
       id_hint: tinkUserId,
       actor_client_id: CLIENT_ID,
