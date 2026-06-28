@@ -362,10 +362,12 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
   const jointContribB = jointFixedTotal*(splitB/100)+extrasForB;
   const personalTotalA = personalBillsA.reduce((s,b)=>s+Number(b.amount),0)+debtsA.reduce((s,d)=>s+Number(d.amount),0)+Number(sess.spending_a)+Number(sess.travel_a);
   const personalTotalB = personalBillsB.reduce((s,b)=>s+Number(b.amount),0)+debtsB.reduce((s,d)=>s+Number(d.amount),0)+Number(sess.spending_b)+Number(sess.travel_b);
-  const potAllocsA = allocations.filter(a=>potMap[a.pot_id]?.owner==='person_a'||potMap[a.pot_id]?.owner==='joint');
+  const potAllocsA = allocations.filter(a=>potMap[a.pot_id]?.owner==='person_a');
   const potAllocsB = allocations.filter(a=>potMap[a.pot_id]?.owner==='person_b');
+  const potAllocsJoint = allocations.filter(a=>potMap[a.pot_id]?.owner==='joint');
   const totalSavingsA = potAllocsA.reduce((s,a)=>s+Number(a.amount),0);
   const totalSavingsB = potAllocsB.reduce((s,a)=>s+Number(a.amount),0);
+  const totalSavingsJoint = potAllocsJoint.reduce((s,a)=>s+Number(a.amount),0);
   const availableA = Number(sess.income_a)-jointContribA-personalTotalA;
   const availableB = Number(sess.income_b)-jointContribB-personalTotalB;
   const totalIncome = Number(sess.income_a)+Number(sess.income_b);
@@ -446,9 +448,12 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
       </div>
 
       {/* Savings */}
-      {(potAllocsA.length>0||potAllocsB.length>0) && (
+      {(potAllocsA.length>0||potAllocsB.length>0||potAllocsJoint.length>0) && (
         <div className="space-y-3">
           <h2 className="text-lg font-bold text-[#181c1c] flex items-center gap-2"><span>🏦</span> Savings</h2>
+          {isPartner && potAllocsJoint.length>0 && (
+            <SavingsCard name="Joint savings" allocs={potAllocsJoint} potMap={potMap} total={totalSavingsJoint} available={availableA+availableB} joint splitA={splitA} splitB={splitB} nameA={hh.person_a_name} nameB={hh.person_b_name} />
+          )}
           <div className={isPartner?'grid grid-cols-1 md:grid-cols-2 gap-4':''}>
             {potAllocsA.length>0 && <SavingsCard name={hh.person_a_name} allocs={potAllocsA} potMap={potMap} total={totalSavingsA} available={availableA} />}
             {isPartner&&potAllocsB.length>0 && <SavingsCard name={hh.person_b_name} allocs={potAllocsB} potMap={potMap} total={totalSavingsB} available={availableB} />}
@@ -464,9 +469,9 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
           <Recap label="Joint outgoings" value={fmt(totalJoint)} negative />
           <Recap label={`${hh.person_a_name}&apos;s personal`} value={fmt(personalTotalA)} negative />
           {isPartner && <Recap label={`${hh.person_b_name}&apos;s personal`} value={fmt(personalTotalB)} negative />}
-          <Recap label="Saved / invested" value={fmt(totalSavingsA+totalSavingsB)} positive />
+          <Recap label="Saved / invested" value={fmt(totalSavingsA+totalSavingsB+totalSavingsJoint)} positive />
           <div className="border-t border-[#ebeeed] pt-3">
-            <Recap label="Savings rate" value={`${Math.round(((totalSavingsA+totalSavingsB)/totalIncome)*100)}%`} positive bold />
+            <Recap label="Savings rate" value={`${Math.round(((totalSavingsA+totalSavingsB+totalSavingsJoint)/totalIncome)*100)}%`} positive bold />
           </div>
         </div>
       </div>
@@ -1361,21 +1366,32 @@ function PersonCard({ name, income, jointContrib, personalBills, debts, spending
   );
 }
 
-function SavingsCard({ name, allocs, potMap, total, available }: { name: string; allocs: Allocation[]; potMap: Record<string,Pot>; total: number; available: number }) {
+function SavingsCard({ name, allocs, potMap, total, available, joint, splitA, splitB, nameA, nameB }: {
+  name: string; allocs: Allocation[]; potMap: Record<string,Pot>; total: number; available: number;
+  joint?: boolean; splitA?: number; splitB?: number; nameA?: string; nameB?: string;
+}) {
   return (
     <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)]">
-      <div className="flex items-center gap-2 mb-1"><span>💰</span><h3 className="font-bold text-[#181c1c]">{name}&apos;s savings</h3></div>
+      <div className="flex items-center gap-2 mb-1">
+        <span>{joint ? '🤝' : '💰'}</span>
+        <h3 className="font-bold text-[#181c1c]">{joint ? name : `${name}'s savings`}</h3>
+        {joint && splitA != null && <span className="text-xs text-[#717970] font-medium">Split {splitA}/{splitB}</span>}
+      </div>
       <p className="text-xs text-[#717970] mb-4">Transfers to make this month</p>
       <div className="space-y-0">
         {allocs.map(a=>{
           const pot=potMap[a.pot_id]; if(!pot) return null;
-          const pct=available>0?Math.round(Number(a.amount)/available*100):0;
+          const amt = Number(a.amount);
           return (
             <div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-[#ebeeed] last:border-0">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:pot.color}} />
-              <span className="text-sm flex-1 text-[#181c1c] font-medium">{pot.name}</span>
-              {pct>0&&<span className="text-xs text-[#717970] w-10 text-right font-medium">{pct}%</span>}
-              <span className="text-sm font-bold text-[#396940]">{fmt(Number(a.amount))}</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-[#181c1c] font-medium">{pot.name}</span>
+                {joint && splitA != null && (
+                  <div className="text-xs text-[#9aaa98] mt-0.5">{nameA}: {fmt(amt*(splitA!/100))} · {nameB}: {fmt(amt*(splitB!/100))}</div>
+                )}
+              </div>
+              <span className="text-sm font-bold text-[#396940]">{fmt(amt)}</span>
             </div>
           );
         })}
