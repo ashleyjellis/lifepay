@@ -405,12 +405,6 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
         </h2>
         <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)]">
           <p className="text-sm text-[#717970] mb-4">Shared bills split by your ratio</p>
-          {isPartner && (
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <ActionCard label={`${hh.person_a_name} transfers`} amount={jointContribA} />
-              <ActionCard label={`${hh.person_b_name} transfers`} amount={jointContribB} />
-            </div>
-          )}
           {jointFixed.length>0 && (
             <>
               <SLabel>Fixed bills</SLabel>
@@ -432,6 +426,12 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
             <span className="text-[#414940]">Total joint outgoings</span>
             <span className="text-[#181c1c]">{fmt(totalJoint)}</span>
           </div>
+          {isPartner && (
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <ActionCard label={`${hh.person_a_name} transfers`} amount={jointContribA} />
+              <ActionCard label={`${hh.person_b_name} transfers`} amount={jointContribB} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -1324,10 +1324,6 @@ function PersonCard({ name, income, jointContrib, personalBills, debts, spending
         <span className="text-sm font-medium text-[#717970]">{fmt(income)} income</span>
       </h2>
       <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(57,105,64,0.07)] space-y-3">
-        <div className="bg-[#f1f4f2] rounded-xl px-4 py-3 flex items-center justify-between">
-          <span className="text-xs text-[#396940] font-bold">Transfer to joint account</span>
-          <span className="text-base font-bold text-[#396940]">{fmt(jointContrib)}</span>
-        </div>
         {(personalBills.length>0||debts.length>0||spending>0||travel>0) && (
           <>
             <SLabel>Personal outgoings</SLabel>
@@ -1355,7 +1351,7 @@ function PersonCard({ name, income, jointContrib, personalBills, debts, spending
         )}
         <div className="border-t border-[#ebeeed] pt-3">
           <div className="flex justify-between text-sm font-bold">
-            <span className="text-[#414940]">Remainder after savings</span>
+            <span className="text-[#414940]">Unallocated</span>
             <span className={income-jointContrib-personalTotal-savingsTotal<-0.01?'text-[#ba1a1a]':'text-[#181c1c]'}>
               {fmt(income-jointContrib-personalTotal-savingsTotal)}
             </span>
