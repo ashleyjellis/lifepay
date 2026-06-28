@@ -368,6 +368,8 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
   const totalSavingsA = potAllocsA.reduce((s,a)=>s+Number(a.amount),0);
   const totalSavingsB = potAllocsB.reduce((s,a)=>s+Number(a.amount),0);
   const totalSavingsJoint = potAllocsJoint.reduce((s,a)=>s+Number(a.amount),0);
+  const jointSavForA = totalSavingsJoint*(splitA/100);
+  const jointSavForB = totalSavingsJoint*(splitB/100);
   const availableA = Number(sess.income_a)-jointContribA-personalTotalA;
   const availableB = Number(sess.income_b)-jointContribB-personalTotalB;
   const totalIncome = Number(sess.income_a)+Number(sess.income_b);
@@ -439,11 +441,11 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
       <div className={isPartner ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : ''}>
         <PersonCard name={hh.person_a_name} income={Number(sess.income_a)} jointContrib={jointContribA}
           personalBills={personalBillsA} debts={debtsA} spending={Number(sess.spending_a)} travel={Number(sess.travel_a)}
-          personalTotal={personalTotalA} savingsTotal={totalSavingsA} />
+          personalTotal={personalTotalA} savingsTotal={totalSavingsA} jointSavings={jointSavForA} />
         {isPartner && (
           <PersonCard name={hh.person_b_name} income={Number(sess.income_b)} jointContrib={jointContribB}
             personalBills={personalBillsB} debts={debtsB} spending={Number(sess.spending_b)} travel={Number(sess.travel_b)}
-            personalTotal={personalTotalB} savingsTotal={totalSavingsB} />
+            personalTotal={personalTotalB} savingsTotal={totalSavingsB} jointSavings={jointSavForB} />
         )}
       </div>
 
@@ -807,19 +809,32 @@ function InlineEdit({ hh, pots: initPots, existingId, detail, latestLockedDetail
   const jointSavForB = potsJoint.reduce((s,p)=>s+(parseFloat(jointPotAmounts[p.id])||0)*(splitB/100),0);
   const availableA = iA-(jointTotal*splitA/100)-extrasForA-personalTotalA-jointSavForA;
   const availableB = iB-(jointTotal*splitB/100)-extrasForB-personalTotalB-jointSavForB;
-  // Fixed-£ pots are deducted from the pool first; remaining split by whole-% among pct-mode pots
+  // Fixed-£ pots are deducted from the pool first; remaining split by whole-% among pct-mode pots.
+  // Pct amounts are floored to 1p and any leftover pence given to the last pct-pot so total = pool exactly.
   const fixedTotalA = potsPersonA.filter(p=>inputModeA[p.id]==='gbp').reduce((s,p)=>s+(parseFloat(valuesA[p.id])||0),0);
   const fixedTotalB = potsPersonB.filter(p=>inputModeB[p.id]==='gbp').reduce((s,p)=>s+(parseFloat(valuesB[p.id])||0),0);
   const pctPoolA = Math.max(0, availableA - fixedTotalA);
   const pctPoolB = Math.max(0, availableB - fixedTotalB);
-  const potAmountA = (id: string) => inputModeA[id]==='gbp' ? (parseFloat(valuesA[id])||0) : pctPoolA*((parseFloat(percentsA[id])||0)/100);
-  const potAmountB = (id: string) => inputModeB[id]==='gbp' ? (parseFloat(valuesB[id])||0) : pctPoolB*((parseFloat(percentsB[id])||0)/100);
   const allocPctA = potsPersonA.filter(p=>inputModeA[p.id]!=='gbp').reduce((s,p)=>s+(parseFloat(percentsA[p.id])||0),0);
   const allocPctB = potsPersonB.filter(p=>inputModeB[p.id]!=='gbp').reduce((s,p)=>s+(parseFloat(percentsB[p.id])||0),0);
   const pctPotsA = potsPersonA.filter(p=>inputModeA[p.id]!=='gbp');
   const pctPotsB = potsPersonB.filter(p=>inputModeB[p.id]!=='gbp');
-  const aReady = fixedTotalA<=availableA&&(pctPotsA.length===0||Math.abs(100-allocPctA)<0.5);
-  const bReady = !isPartner||(fixedTotalB<=availableB&&(pctPotsB.length===0||Math.abs(100-allocPctB)<0.5));
+  // Build rounded pct amounts: floor each to 1p, last pot absorbs remainder
+  function buildPctAmounts(pctPots: Pot[], pool: number, percents: Record<string,string>): Record<string,number> {
+    if (!pctPots.length || pool <= 0) return {};
+    const floored = pctPots.map(p => Math.floor(pool*(parseFloat(percents[p.id])||0)/100*100)/100);
+    const sumFloored = floored.reduce((s,v)=>s+v,0);
+    const remainder = Math.round((pool - sumFloored)*100)/100;
+    const result: Record<string,number> = {};
+    pctPots.forEach((p,i) => { result[p.id] = i === pctPots.length-1 ? floored[i]+remainder : floored[i]; });
+    return result;
+  }
+  const pctAmountsA = buildPctAmounts(pctPotsA, pctPoolA, percentsA);
+  const pctAmountsB = buildPctAmounts(pctPotsB, pctPoolB, percentsB);
+  const potAmountA = (id: string) => inputModeA[id]==='gbp' ? (parseFloat(valuesA[id])||0) : (pctAmountsA[id]??0);
+  const potAmountB = (id: string) => inputModeB[id]==='gbp' ? (parseFloat(valuesB[id])||0) : (pctAmountsB[id]??0);
+  const aReady = fixedTotalA<=availableA&&(pctPotsA.length===0||Math.abs(100-allocPctA)<0.01);
+  const bReady = !isPartner||(fixedTotalB<=availableB&&(pctPotsB.length===0||Math.abs(100-allocPctB)<0.01));
   const canLock = aReady&&bReady&&availableA>=0&&(!isPartner||availableB>=0);
   const totalSavingsA = potsPersonA.reduce((s,p)=>s+potAmountA(p.id),0)+jointSavForA;
   const totalSavingsB = potsPersonB.reduce((s,p)=>s+potAmountB(p.id),0)+jointSavForB;
@@ -1314,8 +1329,8 @@ function BillRow({ name, amount, splitA, splitB, tag }: { name: string; amount: 
   );
 }
 
-function PersonCard({ name, income, jointContrib, personalBills, debts, spending, travel, personalTotal, savingsTotal }: {
-  name: string; income: number; jointContrib: number; personalBills: SessionBill[]; debts: SessionBill[]; spending: number; travel: number; personalTotal: number; savingsTotal: number;
+function PersonCard({ name, income, jointContrib, personalBills, debts, spending, travel, personalTotal, savingsTotal, jointSavings }: {
+  name: string; income: number; jointContrib: number; personalBills: SessionBill[]; debts: SessionBill[]; spending: number; travel: number; personalTotal: number; savingsTotal: number; jointSavings: number;
 }) {
   return (
     <div className="space-y-3">
@@ -1352,8 +1367,8 @@ function PersonCard({ name, income, jointContrib, personalBills, debts, spending
         <div className="border-t border-[#ebeeed] pt-3">
           <div className="flex justify-between text-sm font-bold">
             <span className="text-[#414940]">Unallocated</span>
-            <span className={income-jointContrib-personalTotal-savingsTotal<-0.01?'text-[#ba1a1a]':'text-[#181c1c]'}>
-              {fmt(income-jointContrib-personalTotal-savingsTotal)}
+            <span className={income-jointContrib-personalTotal-savingsTotal-jointSavings<-0.01?'text-[#ba1a1a]':'text-[#181c1c]'}>
+              {fmt(income-jointContrib-personalTotal-savingsTotal-jointSavings)}
             </span>
           </div>
         </div>
