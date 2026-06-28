@@ -141,6 +141,7 @@ function InvestModal({
 
   useEffect(() => {
     if (!open) return;
+    setSaving(false);
     if (pot) {
       setAccountType(pot.account_type || 'savings_account');
       setProvider(pot.provider || '');
@@ -691,6 +692,11 @@ export default function GrowthPage() {
                           <div>
                             <p className="text-sm font-semibold text-[#1a2b1a]">{pot.provider ?? pot.name}</p>
                             <p className="text-xs text-[#717970]">{accountTypeLabel(pot.account_type)}</p>
+                            {household && (
+                              <span className="inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#f1f4f2] text-[#717970]">
+                                {pot.owner === 'person_a' ? household.person_a_name : pot.owner === 'person_b' ? household.person_b_name : 'Joint'}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -782,6 +788,11 @@ export default function GrowthPage() {
                           <div>
                             <p className="text-sm font-semibold text-[#1a2b1a]">{pot.provider ?? pot.name}</p>
                             <p className="text-xs text-[#717970]">{accountTypeLabel(pot.account_type)}</p>
+                            {household && (
+                              <span className="inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#f1f4f2] text-[#717970]">
+                                {pot.owner === 'person_a' ? household.person_a_name : pot.owner === 'person_b' ? household.person_b_name : 'Joint'}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
