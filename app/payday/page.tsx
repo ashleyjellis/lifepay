@@ -469,8 +469,8 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
         <div className="space-y-3">
           <Recap label="Total income" value={fmt(totalIncome)} />
           <Recap label="Joint outgoings" value={fmt(totalJoint)} negative />
-          <Recap label={`${hh.person_a_name}&apos;s personal`} value={fmt(personalTotalA)} negative />
-          {isPartner && <Recap label={`${hh.person_b_name}&apos;s personal`} value={fmt(personalTotalB)} negative />}
+          <Recap label={`${hh.person_a_name}'s personal`} value={fmt(personalTotalA)} negative />
+          {isPartner && <Recap label={`${hh.person_b_name}'s personal`} value={fmt(personalTotalB)} negative />}
           <Recap label="Saved / invested" value={fmt(totalSavingsA+totalSavingsB+totalSavingsJoint)} positive />
           <div className="border-t border-[#ebeeed] pt-3">
             <Recap label="Savings rate" value={`${Math.round(((totalSavingsA+totalSavingsB+totalSavingsJoint)/totalIncome)*100)}%`} positive bold />
@@ -478,10 +478,6 @@ function LockedDashboard({ hh, pots, detail, sessionId }: { hh: Household; pots:
         </div>
       </div>
 
-      <Link href={`/payday/dashboard/${sessionId}`}
-        className="block border-2 border-[#7bae7f] py-3.5 rounded-full text-sm font-bold text-[#396940] text-center hover:bg-[#f1f4f2] transition-colors">
-        Open full dashboard →
-      </Link>
     </div>
   );
 }
@@ -1356,22 +1352,20 @@ function PersonCard({ name, income, jointContrib, personalBills, debts, spending
                 <span className="text-sm font-bold">{fmt(Number(d.amount))}</span>
               </div>
             ))}
+            {(personalBills.length>0||debts.length>0) && (spending>0||travel>0) && (
+              <div className="flex justify-between py-1 bg-[#f7faf8] -mx-1 px-1 rounded-lg">
+                <span className="text-xs text-[#717970] font-semibold uppercase tracking-wide">Bills subtotal</span>
+                <span className="text-xs font-bold text-[#414940]">{fmt(personalBills.reduce((s,b)=>s+Number(b.amount),0)+debts.reduce((s,d)=>s+Number(d.amount),0))}</span>
+              </div>
+            )}
             {spending>0 && <div className="flex items-center justify-between py-2 border-b border-[#ebeeed] last:border-0"><span className="text-sm text-[#414940] font-medium">Spending money</span><span className="text-sm font-bold">{fmt(spending)}</span></div>}
-            {travel>0 && <div className="flex items-center justify-between py-2 border-b border-[#ebeeed]"><span className="text-sm text-[#414940] font-medium">Travel</span><span className="text-sm font-bold">{fmt(travel)}</span></div>}
-            <div className="flex justify-between pt-1">
-              <span className="text-sm text-[#414940] font-medium">Personal total</span>
-              <span className="text-sm font-bold text-[#396940]">{fmt(personalTotal)}</span>
+            {travel>0 && <div className="flex items-center justify-between py-2 last:border-0"><span className="text-sm text-[#414940] font-medium">Travel</span><span className="text-sm font-bold">{fmt(travel)}</span></div>}
+            <div className="flex justify-between pt-2 border-t-2 border-[#c8d8c9] mt-1">
+              <span className="text-sm font-bold text-[#2d3130]">Personal total</span>
+              <span className="text-sm font-bold text-[#2d3130]">{fmt(personalTotal)}</span>
             </div>
           </>
         )}
-        <div className="border-t border-[#ebeeed] pt-3">
-          <div className="flex justify-between text-sm font-bold">
-            <span className="text-[#414940]">Unallocated</span>
-            <span className={income-jointContrib-personalTotal-savingsTotal-jointSavings<-0.01?'text-[#ba1a1a]':'text-[#181c1c]'}>
-              {fmt(income-jointContrib-personalTotal-savingsTotal-jointSavings)}
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );
